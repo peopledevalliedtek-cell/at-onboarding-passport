@@ -174,6 +174,14 @@ function fmtDate(dateStr){
   const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543}`;
 }
+function fmtDateTime(isoStr){
+  if(!isoStr) return "-";
+  const d = new Date(isoStr);
+  if(isNaN(d.getTime())) return "-";
+  const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const hh = String(d.getHours()).padStart(2,"0"), mm = String(d.getMinutes()).padStart(2,"0");
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543} ${hh}:${mm} น.`;
+}
 function daysBetween(a,b){
   return Math.round((new Date(b)-new Date(a))/86400000);
 }
@@ -314,7 +322,7 @@ function seedDB(){
 }
 
 /* ---------------------- Store: Google Sheets backend via Apps Script ---------------------- */
-let DB = { org: seedDB().org, templates: [], employees: [], users: [] };
+let DB = { org: seedDB().org, templates: [], employees: [], users: [], auditLog: [] };
 let API_URL = localStorage.getItem(API_URL_KEY) || "";
 let API_CONNECTED = false;
 let POLL_TIMER = null;
@@ -349,12 +357,15 @@ async function refreshDB(){
   DB.templates = json.templates || [];
   DB.employees = json.employees || [];
   DB.users = json.users && json.users.length ? json.users : seedDB().users;
+  DB.auditLog = json.auditLog || [];
 }
-async function persistEmployee(emp){
+async function persistEmployee(emp, actionLabel){
   await apiCall("setEmployee", {id: emp.id, data: emp});
+  logAudit(actionLabel || "บันทึกข้อมูลพนักงาน", emp.fullName || emp.employeeCode || emp.id);
 }
-async function persistDeleteEmployee(id){
+async function persistDeleteEmployee(id, name){
   await apiCall("deleteEmployee", {id});
+  logAudit("ลบพนักงาน", name || id);
 }
 function resizeImageToDataUrl(file, size){
   return new Promise((resolve,reject)=>{
@@ -382,6 +393,8 @@ async function uploadPhoto(empId, file){
   const mime = dataUrl.slice(5, dataUrl.indexOf(";"));
   const base64 = dataUrl.slice(dataUrl.indexOf(",")+1);
   const res = await apiCall("uploadPhoto", {id: empId, filename: file.name, mimeType: mime, base64});
+  const emp = DB.employees.find(e=>e.id===empId);
+  logAudit("อัปโหลดรูปโปรไฟล์", emp ? (emp.fullName||emp.id) : empId);
   return res.photoUrl;
 }
 function avatarImgHtml(photoUrl, name, size){
@@ -391,20 +404,43 @@ function avatarImgHtml(photoUrl, name, size){
   }
   return `<div class="avatar" style="width:${size}px;height:${size}px;flex:none;">${escapeHtml((name||"?").slice(0,1))}</div>`;
 }
-async function persistTemplate(tpl){
+async function persistTemplate(tpl, actionLabel){
   await apiCall("setTemplate", {id: tpl.id, data: tpl});
+  logAudit(actionLabel || "บันทึก Journey Template", tpl.name || tpl.id);
 }
-async function persistDeleteTemplate(id){
+async function persistDeleteTemplate(id, name){
   await apiCall("deleteTemplate", {id});
+  logAudit("ลบ Journey Template", name || id);
 }
 async function persistSettings(){
   await apiCall("setSettings", {data: {
     "ชื่อระบบ": DB.org.systemName, "หน่วยงาน": DB.org.unit,
     "บริษัท 1": DB.org.companies[0]||"", "บริษัท 2": DB.org.companies[1]||""
   }});
+  logAudit("แก้ไขการตั้งค่าระบบ", DB.org.systemName || "");
 }
 async function persistUsers(){
   await apiCall("setUsers", {data: DB.users});
+  logAudit("แก้ไขรหัสผ่าน / ผู้ใช้งานระบบ", "");
+}
+
+/* ---------------------- Audit log ---------------------- */
+function sessionActorLabel(s){
+  if(!s) return "ไม่ทราบผู้ใช้งาน";
+  if(s.role==="employee"){
+    const e = DB.employees.find(x=>x.id===s.employeeId);
+    return e ? (e.fullName||"พนักงานใหม่") : "พนักงานใหม่";
+  }
+  return s.name || roleLabel(s.role);
+}
+function logAudit(action, detail){
+  if(!API_URL) return;
+  const s = getSession();
+  apiCall("logAudit", {
+    actor: sessionActorLabel(s),
+    role: s ? roleLabel(s.role) : "-",
+    action, detail: detail || ""
+  }).catch(()=>{ /* best effort — never block the user's action on logging */ });
 }
 function startPolling(){
   if(POLL_TIMER) return;
@@ -509,20 +545,63 @@ function scoreQuizAnswers(def, answers){
   });
   return { auto, autoMax, manualPending };
 }
+/** emp.exams[roundKey] is an array of attempts (oldest→newest), so retakes keep
+    history instead of overwriting. Old data saved as a single object (before this
+    change) is tolerated transparently. */
+function getExamAttempts(emp, roundKey){
+  const v = emp.exams && emp.exams[roundKey];
+  if(!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
 function getExamResult(emp, roundKey){
-  return (emp.exams && emp.exams[roundKey]) || null;
+  const attempts = getExamAttempts(emp, roundKey);
+  return attempts.length ? attempts[attempts.length-1] : null;
 }
 function examBadgesHtml(emp){
   return Object.values(QUIZ_ROUNDS).map(def=>{
-    const res = getExamResult(emp, def.key);
+    const attempts = getExamAttempts(emp, def.key);
+    const res = attempts.length ? attempts[attempts.length-1] : null;
     const short = def.key==="round1" ? "ปฐมนิเทศ" : "ก่อนผ่านทดลองงาน";
     if(!res) return `<div class="small"><span class="pill pill-gray">${short}: ยังไม่ทำ</span></div>`;
     const pass = (res.auto/res.autoMax) >= def.passPct;
     return `<div class="small mt-4">
-      <span class="pill ${pass?'pill-green':'pill-amber'}">${short}: ${res.auto}/${res.autoMax}${res.manualPending?` (รอตรวจ ${res.manualPending})`:""}</span>
+      <span class="pill ${pass?'pill-green':'pill-amber'}">${short}: ${res.auto}/${res.autoMax}${res.manualPending?` (รอตรวจ ${res.manualPending})`:""}${attempts.length>1?` · ครั้งที่ ${attempts.length}`:""}</span>
       <button class="btn btn-ghost btn-sm" style="padding:2px 8px;margin-left:4px;" data-review-exam-emp="${emp.id}" data-review-exam-round="${def.key}">ดูคำตอบ</button>
     </div>`;
+  }).join("")
+  + `<button class="btn btn-ghost btn-sm mt-4" data-exam-history-emp="${emp.id}">ประวัติการสอบ</button>`;
+}
+function renderExamHistoryModal(emp){
+  const blocks = Object.values(QUIZ_ROUNDS).map(def=>{
+    const attempts = getExamAttempts(emp, def.key);
+    return `<div class="section-title">${escapeHtml(def.label)}</div>
+    <div class="card">
+      ${attempts.length ? `
+      <table>
+        <thead><tr><th>ครั้งที่</th><th>วันที่สอบ</th><th>คะแนน</th><th>ผล</th><th></th></tr></thead>
+        <tbody>
+          ${attempts.map((a,i)=>{
+            const pass = (a.auto/a.autoMax) >= def.passPct;
+            return `<tr>
+              <td>${i+1}${i===attempts.length-1?' <span class="small muted">(ล่าสุด)</span>':''}</td>
+              <td>${fmtDateTime(a.submittedAt)}</td>
+              <td>${a.auto}/${a.autoMax}${a.manualPending?` (รอตรวจ ${a.manualPending})`:""}</td>
+              <td><span class="pill ${pass?'pill-green':'pill-amber'}">${pass?'ผ่านเกณฑ์':'ไม่ผ่านเกณฑ์ — สอบซ่อม'}</span></td>
+              <td><button class="btn btn-ghost btn-sm" data-review-exam-emp="${emp.id}" data-review-exam-round="${def.key}" data-review-exam-attempt="${i}">ดูคำตอบ</button></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>` : `<div class="muted small">ยังไม่มีประวัติการสอบ</div>`}
+    </div>`;
   }).join("");
+  return `
+  <div class="modal-overlay" id="exam-history-overlay">
+    <div class="card" style="max-width:720px;width:100%;max-height:88vh;overflow:auto;margin:5vh auto;">
+      <div class="flex-between"><h3>ประวัติการสอบ — ${escapeHtml(emp.fullName||"")}</h3>
+        <button class="btn btn-ghost btn-sm" id="exam-history-close">ปิด</button></div>
+      ${blocks}
+    </div>
+  </div>`;
 }
 
 /** Read-only question-by-question breakdown: shows what the employee answered,
@@ -680,6 +759,7 @@ function navItemsFor(role){
     {key:"templates", icon:"🧭", label:"Journey Template"},
     {key:"reports", icon:"📈", label:"Reports & Analytics"},
     {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"},
+    {key:"auditlog", icon:"🗂️", label:"Audit Logs"},
     {key:"settings", icon:"⚙️", label:"System Settings"}
   ];
   if(role === "supervisor") return [
@@ -757,11 +837,13 @@ function renderRoute(session){
     dashboard: session.role==="hr" ? "HR Dashboard" : session.role==="supervisor" ? "Team Onboarding" : "My Passport",
     employees:"Employee Management", templates:"Journey Template", reports:"Reports & Analytics",
     settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน",
-    policies:"นโยบายและสวัสดิการพนักงาน", exam:"ข้อสอบปฐมนิเทศ / ก่อนผ่านทดลองงาน"
+    policies:"นโยบายและสวัสดิการพนักงาน", exam:"ข้อสอบปฐมนิเทศ / ก่อนผ่านทดลองงาน",
+    auditlog:"Audit Logs — ประวัติการใช้งานระบบ"
   };
   document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
 
   if(STATE.route === "policies"){ content.innerHTML = renderPolicies(); bindAfterRoute(session); return; }
+  if(STATE.route === "auditlog" && session.role==="hr"){ content.innerHTML = renderAuditLog(); bindAfterRoute(session); return; }
 
   if(session.role === "hr"){
     if(STATE.route==="dashboard") content.innerHTML = renderHRDashboard();
@@ -803,6 +885,32 @@ const POLICY_DOCS = [
   {file:"12-safety-asset-reliability.jpg", title:"การประเมินความเสี่ยงในพื้นที่แผนก Asset Reliability", group:"อุปกรณ์และความปลอดภัย"},
   {file:"13-redflag-harassment.jpg", title:"Red Flag — พฤติกรรมที่ไม่ควรเพิกเฉย (นโยบายห้ามบูลลี่และคุกคามทางเพศ)", group:"จรรยาบรรณ"}
 ];
+/* =========================================================================
+   AUDIT LOGS (HR only) — who did what, when, across the whole system
+   ========================================================================= */
+function renderAuditLog(){
+  const logs = [...(DB.auditLog||[])].reverse(); // newest first
+  return `
+  <div class="card mb-16">
+    <b>Audit Logs — ประวัติการใช้งานระบบ</b>
+    <div class="small muted mt-4">บันทึกอัตโนมัติทุกครั้งที่มีการเพิ่ม/แก้ไข/ลบข้อมูล, ติ๊ก Checklist, ทำข้อสอบ, อัปโหลดรูป ฯลฯ — ย้อนหลังล่าสุด ${logs.length} รายการ</div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>เวลา</th><th>ผู้ทำรายการ</th><th>บทบาท</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead>
+      <tbody>
+        ${logs.length ? logs.map(l=>`<tr>
+          <td class="small">${escapeHtml(l.time||"")}</td>
+          <td>${escapeHtml(l.actor||"")}</td>
+          <td><span class="pill pill-gray small">${escapeHtml(l.role||"")}</span></td>
+          <td>${escapeHtml(l.action||"")}</td>
+          <td class="small muted">${escapeHtml(l.detail||"")}</td>
+        </tr>`).join("") : `<tr><td colspan="5" class="muted">ยังไม่มีประวัติการใช้งาน</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 function renderPolicies(){
   const groups = [];
   POLICY_DOCS.forEach(d=>{ if(!groups.includes(d.group)) groups.push(d.group); });
@@ -1248,11 +1356,11 @@ function renderEmployeeExam(emp){
           <div class="mt-8">
             ${res
               ? `<span class="${pass?'pill pill-green':'pill pill-amber'}">${res.auto} / ${res.autoMax} — ${pass?'ผ่านเกณฑ์ 80%':'ยังไม่ผ่านเกณฑ์ 80%'}</span>
-                 <div class="small muted mt-8">ทำเมื่อ ${fmtDate(res.submittedAt)}${res.manualPending?` · รอ HR ตรวจคำตอบเขียน ${res.manualPending} ข้อ`:""}</div>`
+                 <div class="small muted mt-8">ทำเมื่อ ${fmtDateTime(res.submittedAt)}${res.manualPending?` · รอ HR ตรวจคำตอบเขียน ${res.manualPending} ข้อ`:""}</div>`
               : `<span class="pill pill-gray">ยังไม่ได้ทำ</span>`}
           </div>
-          <div class="flex gap-8 mt-16">
-            <button class="btn btn-secondary btn-sm" data-start-exam="${def.key}">${res? "ทำใหม่อีกครั้ง →" : "เริ่มทำข้อสอบ →"}</button>
+          <div class="flex gap-8 mt-16" style="flex-wrap:wrap;">
+            <button class="btn ${res && !pass ? 'btn-primary':'btn-secondary'} btn-sm" data-start-exam="${def.key}">${!res? "เริ่มทำข้อสอบ →" : pass? "ทำใหม่อีกครั้ง →" : "สอบซ่อม →"}</button>
             ${res? `<button class="btn btn-ghost btn-sm" data-review-exam-emp="${emp.id}" data-review-exam-round="${def.key}">ดูเฉลยคำตอบ</button>` : ""}
           </div>
         </div>`;
@@ -1260,6 +1368,7 @@ function renderEmployeeExam(emp){
       <div class="card">
         <div class="small muted">วันครบกำหนดทดลองงาน</div>
         <div class="mt-8" style="font-weight:700;">${due? fmtDate(due) : "-"}</div>
+        <button class="btn btn-ghost btn-sm mt-16" data-exam-history-emp="${emp.id}">ดูประวัติการสอบทั้งหมด</button>
       </div>
     </div>`;
   }
@@ -1350,6 +1459,31 @@ function closeModal(id){
   document.getElementById(id)?.remove();
 }
 
+function bindExamReviewButtons(root){
+  root.querySelectorAll("[data-review-exam-emp]").forEach(el=>{
+    el.onclick = ()=>{
+      const emp = DB.employees.find(e=>e.id===el.dataset.reviewExamEmp);
+      const def = QUIZ_ROUNDS[el.dataset.reviewExamRound];
+      const attempts = getExamAttempts(emp, def.key);
+      const idx = el.dataset.reviewExamAttempt!==undefined ? Number(el.dataset.reviewExamAttempt) : attempts.length-1;
+      const res = attempts[idx] || null;
+      openModal(`
+      <div class="modal-overlay" id="exam-review-overlay">
+        <div class="card" style="max-width:720px;width:100%;max-height:88vh;overflow:auto;margin:5vh auto;">
+          <div class="flex-between">
+            <h3>${escapeHtml(def.label)} — ${escapeHtml(emp.fullName||"")}</h3>
+            <button class="btn btn-ghost btn-sm" id="exam-review-close">ปิด</button>
+          </div>
+          <div class="mt-16">${renderExamReviewBlock(def, res)}</div>
+        </div>
+      </div>`);
+      const reviewOverlay = document.getElementById("exam-review-overlay");
+      document.getElementById("exam-review-close").onclick = ()=> closeModal("exam-review-overlay");
+      reviewOverlay.onclick = (e)=>{ if(e.target===reviewOverlay) closeModal("exam-review-overlay"); };
+    };
+  });
+}
+
 function bindAfterRoute(session){
   bindChecklistOpeners(session);
 
@@ -1366,26 +1500,19 @@ function bindAfterRoute(session){
   document.querySelectorAll("[data-exam-text]").forEach(el=>{
     el.onchange = ()=>{ STATE.examDraft[el.dataset.examText] = el.value; };
   });
-  // Answer review (HR / Supervisor: any employee; Employee: only their own — same UI)
-  document.querySelectorAll("[data-review-exam-emp]").forEach(el=>{
+  // Exam history (list of all attempts per round)
+  document.querySelectorAll("[data-exam-history-emp]").forEach(el=>{
     el.onclick = ()=>{
-      const emp = DB.employees.find(e=>e.id===el.dataset.reviewExamEmp);
-      const def = QUIZ_ROUNDS[el.dataset.reviewExamRound];
-      const res = getExamResult(emp, def.key);
-      openModal(`
-      <div class="modal-overlay" id="exam-review-overlay">
-        <div class="card" style="max-width:720px;width:100%;max-height:88vh;overflow:auto;margin:5vh auto;">
-          <div class="flex-between">
-            <h3>${escapeHtml(def.label)} — ${escapeHtml(emp.fullName||"")}</h3>
-            <button class="btn btn-ghost btn-sm" id="exam-review-close">ปิด</button>
-          </div>
-          <div class="mt-16">${renderExamReviewBlock(def, res)}</div>
-        </div>
-      </div>`);
-      document.getElementById("exam-review-close").onclick = ()=> closeModal("exam-review-overlay");
-      document.getElementById("exam-review-overlay").onclick = (e)=>{ if(e.target.id==="exam-review-overlay") closeModal("exam-review-overlay"); };
+      const emp = DB.employees.find(e=>e.id===el.dataset.examHistoryEmp);
+      openModal(renderExamHistoryModal(emp));
+      const overlay = document.getElementById("exam-history-overlay");
+      document.getElementById("exam-history-close").onclick = ()=> closeModal("exam-history-overlay");
+      overlay.onclick = (e)=>{ if(e.target===overlay) closeModal("exam-history-overlay"); };
+      bindExamReviewButtons(overlay);
     };
   });
+  // Answer review (HR / Supervisor: any employee; Employee: only their own — same UI)
+  bindExamReviewButtons(document);
   document.getElementById("exam-submit-btn")?.addEventListener("click", async ()=>{
     const def = QUIZ_ROUNDS[STATE.examActiveRound];
     const unanswered = def.questions.filter(q=>{
@@ -1396,13 +1523,16 @@ function bindAfterRoute(session){
     const scored = scoreQuizAnswers(def, STATE.examDraft);
     const emp = DB.employees.find(e=>e.id===session.employeeId);
     emp.exams = emp.exams || {};
-    emp.exams[STATE.examActiveRound] = {
+    const attempts = getExamAttempts(emp, STATE.examActiveRound);
+    const isRetake = attempts.length > 0;
+    attempts.push({
       answers: {...STATE.examDraft},
       auto: scored.auto, autoMax: scored.autoMax, manualPending: scored.manualPending,
       submittedAt: new Date().toISOString()
-    };
+    });
+    emp.exams[STATE.examActiveRound] = attempts;
     try{
-      await persistEmployee(emp);
+      await persistEmployee(emp, isRetake ? `สอบซ่อม: ${def.label}` : `ส่งคำตอบข้อสอบ: ${def.label}`);
       STATE.examActiveRound = null; STATE.examDraft = {};
       renderRoute(session);
       toast(`ส่งคำตอบแล้ว — ได้ ${scored.auto}/${scored.autoMax} คะแนน`);
@@ -1433,7 +1563,8 @@ function bindAfterRoute(session){
     el.onclick = async ()=>{
       if(confirm("ยืนยันลบพนักงานคนนี้?")){
         try{
-          await persistDeleteEmployee(el.dataset.delEmp);
+          const emp = DB.employees.find(e=>e.id===el.dataset.delEmp);
+          await persistDeleteEmployee(el.dataset.delEmp, emp && emp.fullName);
           DB.employees = DB.employees.filter(e=>e.id!==el.dataset.delEmp);
           renderRoute(session); toast("ลบข้อมูลแล้ว");
         }catch(e){ toast("ลบไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
@@ -1453,7 +1584,8 @@ function bindAfterRoute(session){
       if(el.disabled) return;
       if(confirm("ยืนยันลบ Template นี้?")){
         try{
-          await persistDeleteTemplate(el.dataset.delTpl);
+          const tpl = DB.templates.find(t=>t.id===el.dataset.delTpl);
+          await persistDeleteTemplate(el.dataset.delTpl, tpl && tpl.name);
           DB.templates = DB.templates.filter(t=>t.id!==el.dataset.delTpl);
           renderRoute(session); toast("ลบ Template แล้ว");
         }catch(e){ toast("ลบไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
@@ -1576,7 +1708,7 @@ function bindSupervisorChecklistModal(emp, session){
           item.done = !item.done; item.date = item.done?today():"";
           closeModal("s-chk-modal-overlay");
           openModal(renderSupervisorChecklistModal(emp)); bindSupervisorChecklistModal(emp, session);
-          try{ await persistEmployee(emp); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+          try{ await persistEmployee(emp, `ติ๊ก Onboarding Checklist: ${item.label}${item.done?' (เสร็จแล้ว)':' (ยกเลิก)'}`); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
           return;
         }
       }
@@ -1588,7 +1720,7 @@ function bindSupervisorChecklistModal(emp, session){
         const item = emp.checklist[k].find(i=>i.id===el.dataset.sNote);
         if(item){
           item.note = el.value;
-          try{ await persistEmployee(emp); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+          try{ await persistEmployee(emp, `บันทึกหมายเหตุ Checklist: ${item.label}`); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
           return;
         }
       }
@@ -1625,7 +1757,7 @@ function bindEmployeeFormModal(empId){
     emp.hrContact = {name:val("ef-hr-name"),position:val("ef-hr-pos"),phone:val("ef-hr-phone"),line:""};
     const saveBtn = document.getElementById("emp-save-btn"); saveBtn.disabled = true;
     try{
-      await persistEmployee(emp);
+      await persistEmployee(emp, empId ? `แก้ไขข้อมูลพนักงาน: ${emp.fullName}` : `เพิ่มพนักงานใหม่: ${emp.fullName}`);
       if(!empId) DB.employees.push(emp);
       closeModal("emp-modal-overlay");
       renderRoute(getSession());
@@ -1722,7 +1854,7 @@ function bindReflectionModal(empId, round, who, session){
     }
     const saveBtn = document.getElementById("refl-save-btn"); saveBtn.disabled = true;
     try{
-      await persistEmployee(emp);
+      await persistEmployee(emp, `ส่งแบบสะท้อนรอบ ${round} (${who==='employee'?'พนักงาน':'พี่เลี้ยง/หัวหน้างาน'})`);
       closeModal("refl-modal-overlay");
       renderRoute(session);
       toast("บันทึกแบบสะท้อนแล้ว");

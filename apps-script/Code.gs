@@ -24,8 +24,10 @@ var SHEETS = {
   KPI: 'ตัวชี้วัด KPI ทดลองงาน',
   REFLECTION: 'แบบสะท้อน 2 ทาง',
   EXAM: 'ผลสอบปฐมนิเทศ',
-  USERS: 'ผู้ใช้งานระบบ'
+  USERS: 'ผู้ใช้งานระบบ',
+  AUDIT: 'Audit Log'
 };
+var AUDIT_LOG_MAX_ROWS_RETURNED = 500; // avoid an ever-growing payload on every page load
 
 var BRAND_RED = '#c0272d';
 var BRAND_DARK = '#3a1012';
@@ -41,7 +43,8 @@ function doGet(e) {
         settings: readSettings_(),
         templates: readTemplates_(),
         employees: readEmployees_(),
-        users: readUsers_()
+        users: readUsers_(),
+        auditLog: readAuditLog_()
       });
     }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
@@ -63,6 +66,10 @@ function doPost(e) {
     if (action === 'uploadPhoto') {
       var photo = uploadEmployeePhoto_(body.id, body.filename, body.mimeType, body.base64);
       return jsonResponse_({ ok: true, photoUrl: photo.photoUrl });
+    }
+    if (action === 'logAudit') {
+      appendAuditLog_(body.actor, body.role, body.action, body.detail);
+      return jsonResponse_({ ok: true });
     }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
   } catch (err) {
@@ -106,6 +113,7 @@ function setupSheets() {
     'ร้อยละ', 'ผลสอบ', 'จำนวนข้อเขียนตอบรอ HR ตรวจ', 'วันที่สอบ'
   ]);
   ensureSheet_(ss, SHEETS.USERS, ['บทบาท', 'ชื่อผู้ใช้งาน', 'รหัสผ่าน']);
+  ensureSheet_(ss, SHEETS.AUDIT, ['เวลา', 'ผู้ทำรายการ', 'บทบาท', 'การกระทำ', 'รายละเอียด']);
 
   // seed default settings + users + one starter template if sheets are empty
   if (readSettings_().length === 0 || Object.keys(flattenSettings_(readSettings_())).length === 0) {
@@ -307,6 +315,30 @@ function writeUsers_(list) {
   sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 3).clearContent();
   var rows = list.map(function (u) { return [u.role, u.name, u.pin]; });
   if (rows.length) sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+
+/* ========================= audit log ========================= */
+
+/** Appended once per significant action from the client (see logAudit() in
+    index.html) — never overwritten, so this is a growing history, not a
+    JSON-blob-backed summary like the other sheets. */
+function appendAuditLog_(actor, role, action, detail) {
+  var sheet = sheetByName_(SHEETS.AUDIT);
+  var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  sheet.appendRow([ts, actor || '', role || '', action || '', detail || '']);
+}
+
+/** Returns the most recent rows only (oldest→newest), so the client's list
+    payload doesn't keep growing forever as the log sheet does. */
+function readAuditLog_() {
+  var sheet = sheetByName_(SHEETS.AUDIT);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var startRow = Math.max(2, lastRow - AUDIT_LOG_MAX_ROWS_RETURNED + 1);
+  var values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 5).getValues();
+  return values.map(function (r) {
+    return { time: r[0] ? String(r[0]) : '', actor: r[1], role: r[2], action: r[3], detail: r[4] };
+  });
 }
 
 /* ========================= templates ========================= */
@@ -513,21 +545,29 @@ function answerLabel_(a) {
 function examRoundLabel_(key) {
   return { round1: 'ข้อสอบปฐมนิเทศ (วันปฐมนิเทศ)', round2: 'ข้อสอบก่อนผ่านทดลองงาน' }[key] || key;
 }
+/** data.exams[roundKey] is an array of attempts (oldest→newest) so retakes
+    ("สอบซ่อม") show up as separate numbered rows here — full exam history,
+    not just the latest attempt. Tolerates old data saved as a single object
+    (before attempts became an array). */
 function rewriteExamSummary_(id, data) {
   var sheet = sheetByName_(SHEETS.EXAM);
   deleteRowsMatchingFirstCol_(sheet, id);
   var exams = data.exams || {};
   var rows = [];
   Object.keys(exams).forEach(function (roundKey) {
-    var r = exams[roundKey] || {};
-    var pct = r.autoMax ? Math.round((r.auto / r.autoMax) * 100) : 0;
-    var result = r.autoMax ? (pct >= 80 ? 'ผ่านเกณฑ์ (80%)' : 'ไม่ผ่านเกณฑ์ (80%)') : '-';
-    rows.push([
-      id, data.fullName || '', examRoundLabel_(roundKey),
-      r.auto != null ? r.auto : '', r.autoMax != null ? r.autoMax : '',
-      r.autoMax ? pct + '%' : '', result, r.manualPending || 0,
-      r.submittedAt ? Utilities.formatDate(new Date(r.submittedAt), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : ''
-    ]);
+    var raw = exams[roundKey];
+    var attempts = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    attempts.forEach(function (r, i) {
+      var pct = r.autoMax ? Math.round((r.auto / r.autoMax) * 100) : 0;
+      var result = r.autoMax ? (pct >= 80 ? 'ผ่านเกณฑ์ (80%)' : 'ไม่ผ่านเกณฑ์ (80%)') : '-';
+      var attemptLabel = (i + 1) + (i === 0 ? '' : ' (สอบซ่อม)') + (i === attempts.length - 1 ? ' — ล่าสุด' : '');
+      rows.push([
+        id, data.fullName || '', examRoundLabel_(roundKey) + ' · ครั้งที่ ' + attemptLabel,
+        r.auto != null ? r.auto : '', r.autoMax != null ? r.autoMax : '',
+        r.autoMax ? pct + '%' : '', result, r.manualPending || 0,
+        r.submittedAt ? Utilities.formatDate(new Date(r.submittedAt), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : ''
+      ]);
+    });
   });
   if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
 }
