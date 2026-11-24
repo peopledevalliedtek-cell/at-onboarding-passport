@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AT Digital Onboarding Passport</title>
+<meta name="description" content="ระบบบริหารจัดการพนักงานใหม่ตั้งแต่ก่อนเริ่มงานจนสิ้นสุด Onboarding และติดตามผลทดลองงาน · Allied-Tek">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c0272d">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AT Passport">
+<style>
+:root{
+  --red:#c0272d; --red-dark:#8f1e23; --ink:#1f2328; --sub:#5b6168;
+  --bg:#f5f6f8; --card:#ffffff; --line:#e5e7eb; --green:#1a7f45; --amber:#b8860b;
+  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.06);
+  font-size:16px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font-family:"Segoe UI",system-ui,-apple-system,"Noto Sans Thai",sans-serif;
+  -webkit-font-smoothing:antialiased;}
+button{font-family:inherit;}
+a{color:inherit;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+.hidden{display:none !important;}
+.btn{border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s;}
+.btn-primary{background:var(--red);color:#fff;}
+.btn-primary:hover{background:var(--red-dark);}
+.btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+.btn-ghost:hover{background:#f0f1f3;}
+.btn-sm{padding:6px 12px;font-size:13px;border-radius:8px;}
+.btn-danger{background:#fff;color:#b3261e;border:1px solid #f3c7c4;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+input,select,textarea{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);
+  border-radius:9px;background:#fff;color:var(--ink);width:100%;}
+input:focus,select:focus,textarea:focus{outline:2px solid #e3b3b3;border-color:var(--red);}
+label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--sub);font-weight:600;margin-bottom:10px;}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
+.grid{display:grid;gap:14px;}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:900px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+th{color:var(--sub);font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;}
+tr:last-child td{border-bottom:none;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+.pill-green{background:#e6f4ea;color:var(--green);}
+.pill-amber{background:#fdf1dc;color:var(--amber);}
+.pill-gray{background:#eef0f2;color:var(--sub);}
+.pill-red{background:#fbe9e8;color:var(--red-dark);}
+.badge{font-size:11px;font-weight:700;background:#eef0f2;color:var(--sub);padding:2px 8px;border-radius:6px;}
+h1,h2,h3,h4{margin:0 0 4px;}
+.muted{color:var(--sub);}
+.small{font-size:12.5px;}
+.section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);
+  margin:22px 0 10px;}
+.section-title:first-child{margin-top:0;}
+.flex{display:flex;align-items:center;}
+.flex-between{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.flex-wrap{flex-wrap:wrap;}
+.gap-8{gap:8px;} .gap-10{gap:10px;} .gap-16{gap:16px;}
+.mt-8{margin-top:8px;} .mt-16{margin-top:16px;} .mt-24{margin-top:24px;}
+.progress-track{height:8px;border-radius:999px;background:#eef0f2;overflow:hidden;}
+.progress-fill{height:100%;background:var(--red);border-radius:999px;transition:width .3s;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2328;color:#fff;
+  padding:11px 20px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow);z-index:999;opacity:0;
+  pointer-events:none;transition:opacity .25s, transform .25s;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+.modal-overlay{position:fixed;inset:0;background:rgba(20,20,24,.5);display:flex;align-items:flex-start;
+  justify-content:center;padding:4vh 16px;overflow-y:auto;z-index:500;}
+.modal{background:#fff;border-radius:16px;max-width:680px;width:100%;padding:22px;box-shadow:var(--shadow);
+  margin-bottom:4vh;}
+.modal-wide{max-width:920px;}
+.checklist-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:flex-start;
+  padding:10px 0;border-bottom:1px solid var(--line);}
+.checklist-row:last-child{border-bottom:none;}
+.chk-box{width:22px;height:22px;border-radius:6px;border:2px solid var(--line);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex:none;margin-top:2px;}
+.chk-box.done{background:var(--green);border-color:var(--green);}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);padding-bottom:0;}
+.tab{padding:9px 14px;font-size:13.5px;font-weight:600;color:var(--sub);border-bottom:2px solid transparent;
+  cursor:pointer;white-space:nowrap;}
+.tab.active{color:var(--red);border-color:var(--red);}
+.radio-row{display:flex;gap:16px;flex-wrap:wrap;}
+.radio-opt{display:flex;align-items:center;gap:5px;font-size:13.5px;cursor:pointer;}
+.radio-opt input{width:auto;}
+textarea{min-height:60px;resize:vertical;}
+
+/* ---------- Login screen ---------- */
+#login-screen{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:linear-gradient(160deg,#c0272d 0%,#8f1e23 55%, #3a1012 100%);}
+.login-card{background:#fff;border-radius:20px;padding:34px 30px;max-width:380px;width:100%;
+  box-shadow:0 20px 50px rgba(0,0,0,.35);}
+.login-logo{width:54px;height:54px;border-radius:14px;background:var(--red);color:#fff;font-weight:800;
+  font-size:20px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.login-card h1{font-size:19px;}
+.login-card p.sub{color:var(--sub);font-size:13px;margin:4px 0 20px;}
+.role-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;}
+.role-opt{border:1.5px solid var(--line);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;
+  font-size:12px;font-weight:700;color:var(--sub);}
+.role-opt.active{border-color:var(--red);color:var(--red);background:#fbe9e8;}
+.login-foot{margin-top:18px;text-align:center;font-size:11.5px;color:#9aa0a6;}
+
+/* ---------- App shell ---------- */
+#shell{flex:1;display:flex;min-height:100vh;}
+.sidebar{width:230px;flex:none;background:#1a1d21;color:#fff;display:flex;flex-direction:column;padding:16px 10px;}
+.brand{display:flex;align-items:center;gap:10px;padding:8px 10px 18px;}
+.brand .mark{width:34px;height:34px;border-radius:9px;background:var(--red);display:flex;align-items:center;
+  justify-content:center;font-weight:800;font-size:14px;flex:none;}
+.brand .txt{font-weight:800;font-size:14.5px;line-height:1.2;}
+.brand .txt small{display:block;font-weight:500;color:#9aa0a6;font-size:10.5px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:#c7cbd1;
+  font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:2px;}
+.nav-item:hover{background:#25292e;color:#fff;}
+.nav-item.active{background:var(--red);color:#fff;}
+.side-foot{margin-top:auto;padding:10px;font-size:11.5px;color:#7d838a;}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;}
+.topbar{background:#fff;border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;position:sticky;top:0;z-index:40;}
+.topbar h2{font-size:17px;}
+.content{flex:1;padding:22px;max-width:1180px;width:100%;margin:0 auto;}
+.burger{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink);}
+@media(max-width:860px){
+  .sidebar{position:fixed;inset:0 auto 0 0;z-index:200;transform:translateX(-100%);transition:transform .2s;}
+  .sidebar.open{transform:translateX(0);}
+  .burger{display:block;}
+  .content{padding:14px;}
+  .topbar{padding:10px 14px;}
+}
+.avatar{width:34px;height:34px;border-radius:999px;background:#eef0f2;display:flex;align-items:center;
+  justify-content:center;font-weight:700;font-size:13px;color:var(--sub);flex:none;}
+
+/* passport cover */
+.passport-cover{background:linear-gradient(135deg,#c0272d,#7d1a1f);color:#fff;border-radius:16px;padding:22px 24px;
+  margin-bottom:16px;}
+.passport-cover .tag{font-size:11.5px;letter-spacing:.08em;opacity:.85;text-transform:uppercase;}
+.passport-cover h1{font-size:22px;margin:4px 0 2px;}
+.passport-cover .meta{font-size:13px;opacity:.9;margin-top:6px;}
+.timeline{display:flex;gap:6px;margin-top:14px;}
+.timeline .seg{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.25);overflow:hidden;}
+.timeline .seg b{display:block;height:100%;background:#fff;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* =========================================================================
+   AT DIGITAL ONBOARDING PASSPORT
+   Single-file client-side PWA. Data persists in localStorage on this device.
+   ========================================================================= */
+
+const API_URL_KEY = "AT_PASSPORT_API_URL";
+const SESSION_KEY = "AT_PASSPORT_SESSION_V1";
+const today = () => new Date().toISOString().slice(0,10);
+const uid = (p="id") => p + "_" + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4);
+
+function addDays(dateStr, n){
+  if(!dateStr) return null;
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+function fmtDate(dateStr){
+  if(!dateStr) return "-";
+  const d = new Date(dateStr + "T00:00:00");
+  const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543}`;
+}
+function daysBetween(a,b){
+  return Math.round((new Date(b)-new Date(a))/86400000);
+}
+function escapeHtml(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* ---------------------- Default checklist / KPI builders ---------------------- */
+function defaultChecklist(){
+  return {
+    phase1: {
+      title: "Phase 1 · ก่อนวันเริ่มงาน (Pre-Onboarding)",
+      items: [
+        "จัดทำสัญญาจ้างและเตรียมเอกสารสมัครงานให้ครบถ้วน",
+        "แจ้งฝ่าย IT จัดเตรียมคอมพิวเตอร์ อีเมล และสิทธิ์เข้าใช้งานระบบ (ถ้ามี)",
+        "จัดเตรียมโต๊ะทำงานและอุปกรณ์สำนักงานพื้นฐาน (ถ้ามี)",
+        "ตรวจสอบข้อมูลส่วนบุคคลในระบบ HR ถูกต้องครบถ้วน",
+        "โทรคอนเฟิร์มวันเริ่มงาน เวลา สถานที่ ผู้รับการติดต่อ ทบทวนการแต่งกาย",
+        "แจ้งต้นสังกัด / พี่เลี้ยง เพื่อเตรียมดูแลพนักงานใหม่"
+      ]
+    },
+    phase2: {
+      title: "Phase 2 · เริ่มต้นการทำงาน (Day 1–7)",
+      items: [
+        "ปฐมนิเทศกฎระเบียบ สวัสดิการ วัฒนธรรมองค์กร และความปลอดภัย",
+        "เซ็นสัญญาจ้าง",
+        "แจ้งรายละเอียดหน้าที่การทำงานตาม Job Description",
+        "พนักงานตอบได้ว่าใครคือพี่เลี้ยง และใครคือหัวหน้าโดยตรง",
+        "พาเดินแนะนำตัวกับหัวหน้างานและพี่เลี้ยงรวมถึงทีมที่เกี่ยวข้อง",
+        "ส่งมอบพนักงานให้พี่เลี้ยง (Buddy) ดูแลเรื่องการทานอาหารกลางวัน",
+        "ฝ่าย IT แนะนำการเข้าถึงระบบไอทีของบริษัท (ถ้ามี)",
+        "พาทัวร์อาคารสถานที่บริษัท"
+      ]
+    },
+    phase3: {
+      title: "Phase 3 · ติดตามและประเมินผล (วันที่ 30–60)",
+      items: [
+        "ตรวจสอบการใช้งานระบบงานต่างๆ เช่น เข้า-ออกงาน / การลา / IT",
+        "สอบถามความเป็นอยู่ สายบังคับบัญชา เพื่อนสนิทหรือพี่เลี้ยงคือใคร",
+        "ทบทวนหัวข้อที่ถูกสอนงานจากพี่เลี้ยง / หัวหน้างาน",
+        "ติดตามผลการปฏิบัติงาน ทำงานอะไรมาแล้วบ้าง",
+        "สอบถามปัญหาในแผนก / ความช่วยเหลือที่ต้องการ",
+        "สอบถามว่ามีคำพูดหรือการกระทำที่ทำให้ไม่สบายใจหรือไม่ มีอะไรอยากให้ HR รู้",
+        "ทบทวนหัวข้อปฐมนิเทศ เช่น ผังองค์กร สายบังคับบัญชา",
+        "ทบทวนขั้นตอนแจ้งลาป่วยฉุกเฉิน: แจ้งใคร ทางไหน ก่อนกี่โมง",
+        "ตรวจสอบวันลาหยุดงาน/เหตุจำเป็นเพิ่มเติม (ถ้ามี)"
+      ]
+    },
+    phase4: {
+      title: "Phase 4 · ติดตามและประเมินผลหลังผ่านทดลองงาน (วันที่ 90–สิ้นสุดระยะ)",
+      items: [
+        "ตรวจสอบการสอนงานจากเอกสาร OJT",
+        "สัมภาษณ์เรื่องมาตรฐาน JD / KPI / WI ของตนเอง",
+        "ทบทวนวัฒนธรรมองค์กรและ Core Value ว่ามีอะไรบ้าง",
+        "ยกตัวอย่างการเห็น Core Value จากคนในแผนกทำจริง 1 เรื่อง",
+        "ทบทวนกิจกรรมที่ผ่านมา ดีหรือไม่ดีอย่างไร",
+        "แจ้งสวัสดิการที่จะได้รับหลังผ่านทดลองงาน",
+        "สอบถามปัญหาในแผนก / ความช่วยเหลือ / การสนับสนุนที่ต้องการ"
+      ]
+    }
+  };
+}
+function buildChecklistState(def){
+  const out = {};
+  for(const phaseKey in def){
+    out[phaseKey] = def[phaseKey].items.map(label => ({
+      id: uid("chk"), label, done:false, note:"", date:""
+    }));
+  }
+  return out;
+}
+function defaultKPI(){
+  return [
+    {metric:"ทักษะทางเทคนิคและการปฏิบัติงานจริงตามตำแหน่งงาน", target:"100%", source:"ใบตรวจรับงาน / การสุ่มตรวจหน้างาน"},
+    {metric:"ความรู้และการวิเคราะห์แก้ปัญหาหน้างาน", target:"> 70%", source:"รายงานการแก้ไขปัญหา / แบบทดสอบความรู้"},
+    {metric:"การวางแผนและควบคุมงานให้แล้วเสร็จตามกำหนด", target:"ภายในวันสุดท้ายของทุกสัปดาห์", source:"แผนงานส่วนบุคคล / รายงานสรุปผลประจำสัปดาห์"},
+    {metric:"การสื่อสาร รายงานความคืบหน้า และทำงานร่วมกับทีม", target:"ภายในวันสุดท้ายของทุกสัปดาห์", source:"บันทึกรายงานในกลุ่มสื่อสาร / บันทึกการประชุม"}
+  ];
+}
+function defaultReflectionRounds(){
+  return [
+    { round:1, day:7, label:"รอบ 1 · วันที่ 7" },
+    { round:2, day:30, label:"รอบ 2 · วันที่ 30" },
+    { round:3, day:90, label:"รอบ 3 · วันที่ 90" }
+  ];
+}
+const EMPLOYEE_QUESTIONS = [
+  "ฉันรู้ว่าพี่เลี้ยงและหัวหน้าโดยตรงของฉันคือใคร และหาตัวเจอเมื่อต้องการ",
+  "สัปดาห์ที่ผ่านมาฉันได้รับการสอนงานตามที่ตกลงไว้ (ไม่ใช่ปล่อยให้ดูเอง)",
+  "ฉันกล้าถามเมื่อไม่แน่ใจ โดยไม่ถูกดุหรือถูกมองว่าโง่",
+  "ไม่มีใครใช้คำพูดรุนแรง ล้อเลียนเรื่องส่วนตัว หรือทำอะไรที่ทำให้ฉันไม่สบายใจ",
+  "ถ้ามีปัญหา ฉันรู้ว่าต้องไปบอกใคร และเชื่อว่าจะมีคนจัดการ"
+];
+const MENTOR_QUESTIONS = [
+  "พนักงานใหม่มาตรงเวลา ตั้งใจ ทำตามที่สอนได้",
+  "ถามเมื่อไม่แน่ใจ ไม่เดาทำเอง",
+  "เข้ากับคนในแผนกได้ ไม่มีปัญหาเรื่องการอยู่ร่วมกัน",
+  "ฉันมีเวลาสอนงานพอ"
+];
+
+/* ---------------------- Seed data ---------------------- */
+function seedTemplates(){
+  return [
+    {
+      id: uid("tpl"), name:"ช่างเทคนิค / ปฏิบัติการ (มาตรฐาน)", department:"Asset Reliability / Operations",
+      positionLevel:"ระดับช่าง / ปฏิบัติการ", durationDays:119,
+      checklist: defaultChecklist(), kpi: defaultKPI(), reflectionRounds: defaultReflectionRounds()
+    },
+    {
+      id: uid("tpl"), name:"สำนักงาน / เจ้าหน้าที่ (มาตรฐาน)", department:"สำนักงานทั่วไป",
+      positionLevel:"ระดับเจ้าหน้าที่ / Officer", durationDays:90,
+      checklist: defaultChecklist(), kpi: defaultKPI(), reflectionRounds: defaultReflectionRounds()
+    }
+  ];
+}
+function seedDB(){
+  const templates = seedTemplates();
+  return {
+    org: {
+      systemName:"AT Digital Onboarding Passport",
+      companies:["บริษัท อัลลายด์เทค (ประเทศไทย) จำกัด","บริษัท อัลลายด์เทคเอ็นจิเนียริ่ง จำกัด"],
+      unit:"People & Organization Management · ทีม Onboarding / People Development"
+    },
+    templates,
+    employees: [],
+    users: [
+      {id:uid("usr"), role:"hr", name:"ฝ่าย People & Organization Management", pin:"hr2026"},
+      {id:uid("usr"), role:"supervisor", name:"หัวหน้างาน / พี่เลี้ยง", pin:"lead2026"}
+    ]
+  };
+}
+
+/* ---------------------- Store: Google Sheets backend via Apps Script ---------------------- */
+let DB = { org: seedDB().org, templates: [], employees: [], users: [] };
+let API_URL = localStorage.getItem(API_URL_KEY) || "";
+let API_CONNECTED = false;
+let POLL_TIMER = null;
+let MODAL_OPEN = false;
+
+async function apiCall(action, payload){
+  if(!API_URL) throw new Error("no api url");
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers:{ "Content-Type":"text/plain;charset=utf-8" }, // avoids a CORS preflight against Apps Script
+    body: JSON.stringify({ action, ...payload })
+  });
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || "unknown error");
+  return json;
+}
+async function apiList(){
+  const res = await fetch(API_URL + "?action=list&t=" + Date.now());
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || "unknown error");
+  return json;
+}
+async function refreshDB(){
+  const json = await apiList();
+  const settingsObj = {};
+  (json.settings||[]).forEach(r=>{ settingsObj[r.key] = r.value; });
+  DB.org = {
+    systemName: settingsObj["ชื่อระบบ"] || "AT Digital Onboarding Passport",
+    unit: settingsObj["หน่วยงาน"] || "",
+    companies: [settingsObj["บริษัท 1"], settingsObj["บริษัท 2"]].filter(Boolean)
+  };
+  DB.templates = json.templates || [];
+  DB.employees = json.employees || [];
+  DB.users = json.users && json.users.length ? json.users : seedDB().users;
+}
+async function persistEmployee(emp){
+  await apiCall("setEmployee", {id: emp.id, data: emp});
+}
+async function persistDeleteEmployee(id){
+  await apiCall("deleteEmployee", {id});
+}
+async function persistTemplate(tpl){
+  await apiCall("setTemplate", {id: tpl.id, data: tpl});
+}
+async function persistDeleteTemplate(id){
+  await apiCall("deleteTemplate", {id});
+}
+async function persistSettings(){
+  await apiCall("setSettings", {data: {
+    "ชื่อระบบ": DB.org.systemName, "หน่วยงาน": DB.org.unit,
+    "บริษัท 1": DB.org.companies[0]||"", "บริษัท 2": DB.org.companies[1]||""
+  }});
+}
+async function persistUsers(){
+  await apiCall("setUsers", {data: DB.users});
+}
+function startPolling(){
+  if(POLL_TIMER) return;
+  POLL_TIMER = setInterval(async ()=>{
+    if(MODAL_OPEN || !API_URL) return;
+    try{ await refreshDB(); render(); }catch(e){ /* keep last good state on a transient network error */ }
+  }, 4000);
+}
+function getSession(){
+  try{ return JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){ return null; }
+}
+function setSession(s){ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
+function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+
+/* ---------------------- Employee helpers ---------------------- */
+function newEmployeeFromTemplate(tpl){
+  return {
+    id: uid("emp"),
+    employeeCode:"", fullName:"", nickname:"", position:"", department: tpl.department,
+    team:"", startDate: today(),
+    templateId: tpl.id, durationDays: tpl.durationDays,
+    mentor:{name:"",position:"",phone:"",line:""},
+    supervisor:{name:"",position:"",phone:"",line:""},
+    hrContact:{name:"",position:"",phone:"",line:""},
+    checklist: buildChecklistState(tpl.checklist),
+    kpi: tpl.kpi.map(k=>({...k, notes:""})),
+    reflectionRounds: tpl.reflectionRounds,
+    reflections:{},
+    signatures:{employee:"",mentor:"",sectionMgr:"",deptMgr:"",hr:""},
+    status:"active"
+  };
+}
+function employeeProgress(emp){
+  let total=0, done=0;
+  for(const k in emp.checklist){
+    emp.checklist[k].forEach(i => { total++; if(i.done) done++; });
+  }
+  return total ? Math.round(done/total*100) : 0;
+}
+function employeeDayNumber(emp){
+  return Math.max(0, daysBetween(emp.startDate, today()));
+}
+function employeeEndDate(emp){
+  return addDays(emp.startDate, emp.durationDays);
+}
+function employeeMilestone(emp){
+  const d = employeeDayNumber(emp);
+  const total = emp.durationDays;
+  if(d >= total) return {label:"ครบกำหนดทดลองงาน", key:"done"};
+  if(d >= Math.floor(total*0.75)) return {label:`ช่วงใกล้ครบ ${total} วัน`, key:"late"};
+  if(d >= 30) return {label:"ช่วงติดตามผล 30–90 วัน", key:"mid"};
+  if(d >= 7) return {label:"สัปดาห์แรก", key:"week1"};
+  return {label:"ก่อนเริ่มงาน / วันแรก", key:"start"};
+}
+
+/* =========================================================================
+   RENDER / ROUTER
+   ========================================================================= */
+let STATE = { sidebarOpen:false, route:"dashboard", params:{} };
+
+function render(){
+  const root = document.getElementById("app");
+  if(!API_URL || !API_CONNECTED){
+    root.innerHTML = renderConnect();
+    bindConnect();
+    return;
+  }
+  const session = getSession();
+  if(!session){
+    root.innerHTML = renderLogin();
+    bindLogin();
+    return;
+  }
+  root.innerHTML = renderShell(session);
+  bindShell(session);
+  renderRoute(session);
+}
+
+/* ---------------------- Connect-to-database screen ---------------------- */
+function renderConnect(){
+  return `
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="login-logo">AT</div>
+      <h1>เชื่อมต่อฐานข้อมูล</h1>
+      <p class="sub">ข้อมูลทั้งหมดของระบบนี้เก็บอยู่ใน Google Sheet ของคุณเอง ผ่าน Google Apps Script Web App
+        วาง URL ที่ได้จากขั้นตอน Deploy (ดู README) แล้วกดเชื่อมต่อ — ทุกคนที่จะใช้ระบบต้องวาง URL เดียวกันนี้ในเบราว์เซอร์ของตัวเอง</p>
+      <label class="field">Apps Script Web App URL
+        <input id="connect-url" placeholder="https://script.google.com/macros/s/xxx/exec" value="${escapeHtml(API_URL)}">
+      </label>
+      <button class="btn btn-primary" id="connect-btn" style="width:100%;justify-content:center;">บันทึกและเชื่อมต่อ</button>
+      <div id="connect-msg" class="small mt-16"></div>
+      <div class="login-foot">© ${new Date().getFullYear()+543} Allied-Tek · People & Organization Management</div>
+    </div>
+  </div>`;
+}
+function bindConnect(){
+  document.getElementById("connect-btn").onclick = async ()=>{
+    const url = document.getElementById("connect-url").value.trim();
+    const msg = document.getElementById("connect-msg");
+    if(!url){ msg.textContent = "กรุณาวาง URL ก่อน"; return; }
+    msg.textContent = "กำลังเชื่อมต่อ...";
+    API_URL = url;
+    try{
+      await refreshDB();
+      localStorage.setItem(API_URL_KEY, url);
+      API_CONNECTED = true;
+      startPolling();
+      toast("เชื่อมต่อฐานข้อมูลสำเร็จ");
+      render();
+    }catch(e){
+      msg.textContent = "เชื่อมต่อไม่สำเร็จ — ตรวจสอบ URL และสิทธิ์การ Deploy (Who has access: Anyone) อีกครั้ง";
+    }
+  };
+}
+
+/* ---------------------- Login ---------------------- */
+let loginRole = "employee";
+function renderLogin(){
+  return `
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="login-logo">AT</div>
+      <h1>AT Digital Onboarding Passport</h1>
+      <p class="sub">ระบบ Onboarding & ติดตามทดลองงาน · Allied-Tek</p>
+      <div class="role-grid">
+        <div class="role-opt ${loginRole==='employee'?'active':''}" data-role="employee">พนักงานใหม่</div>
+        <div class="role-opt ${loginRole==='supervisor'?'active':''}" data-role="supervisor">หัวหน้า/พี่เลี้ยง</div>
+        <div class="role-opt ${loginRole==='hr'?'active':''}" data-role="hr">HR Admin</div>
+      </div>
+      <div id="login-fields"></div>
+      <button class="btn btn-primary" id="login-btn" style="width:100%;justify-content:center;margin-top:6px;">เข้าสู่ระบบ</button>
+      <div class="login-foot">© ${new Date().getFullYear()+543} Allied-Tek · People & Organization Management</div>
+    </div>
+  </div>`;
+}
+function loginFieldsHtml(){
+  if(loginRole === "employee"){
+    const opts = DB.employees.map(e=>`<option value="${e.id}">${escapeHtml(e.fullName||"(ไม่มีชื่อ)")} — ${escapeHtml(e.employeeCode||"-")}</option>`).join("");
+    return `<label class="field">เลือกชื่อของคุณ
+      <select id="f-employee">${opts || '<option value="">— ยังไม่มีข้อมูลพนักงาน —</option>'}</select>
+    </label>`;
+  }
+  if(loginRole === "supervisor"){
+    return `<label class="field">ชื่อ-นามสกุล (หัวหน้างาน/พี่เลี้ยง)
+      <input id="f-name" placeholder="เช่น คุณสรศักดิ์ ประจำเมือง">
+    </label>
+    <label class="field">รหัสผ่านทีม <input id="f-pin" type="password" placeholder="lead2026"></label>`;
+  }
+  return `<label class="field">ชื่อผู้ใช้งาน HR <input id="f-name" placeholder="เช่น People & Organization Management"></label>
+    <label class="field">รหัสผ่าน HR <input id="f-pin" type="password" placeholder="hr2026"></label>`;
+}
+function bindLogin(){
+  document.getElementById("login-fields").innerHTML = loginFieldsHtml();
+  document.querySelectorAll(".role-opt").forEach(el=>{
+    el.onclick = ()=>{ loginRole = el.dataset.role; render(); };
+  });
+  document.getElementById("login-btn").onclick = ()=>{
+    if(loginRole === "employee"){
+      const id = document.getElementById("f-employee").value;
+      if(!id){ toast("ยังไม่มีข้อมูลพนักงานในระบบ — ให้ HR เพิ่มข้อมูลก่อน"); return; }
+      setSession({role:"employee", employeeId:id});
+    } else if(loginRole === "supervisor"){
+      const name = document.getElementById("f-name").value.trim();
+      const pin = document.getElementById("f-pin").value.trim();
+      const u = DB.users.find(u=>u.role==="supervisor");
+      if(pin !== (u?u.pin:"lead2026")){ toast("รหัสผ่านไม่ถูกต้อง"); return; }
+      setSession({role:"supervisor", name: name || "หัวหน้างาน/พี่เลี้ยง"});
+    } else {
+      const name = document.getElementById("f-name").value.trim();
+      const pin = document.getElementById("f-pin").value.trim();
+      const u = DB.users.find(u=>u.role==="hr");
+      if(pin !== (u?u.pin:"hr2026")){ toast("รหัสผ่านไม่ถูกต้อง"); return; }
+      setSession({role:"hr", name: name || "HR Admin"});
+    }
+    STATE.route = "dashboard";
+    render();
+  };
+}
+
+/* ---------------------- Shell (sidebar + topbar) ---------------------- */
+function navItemsFor(role){
+  if(role === "hr") return [
+    {key:"dashboard", icon:"📊", label:"HR Dashboard"},
+    {key:"employees", icon:"🧑‍💼", label:"Employee Management"},
+    {key:"templates", icon:"🧭", label:"Journey Template"},
+    {key:"reports", icon:"📈", label:"Reports & Analytics"},
+    {key:"settings", icon:"⚙️", label:"System Settings"}
+  ];
+  if(role === "supervisor") return [
+    {key:"dashboard", icon:"📊", label:"Team Onboarding"},
+    {key:"approval", icon:"✅", label:"Approval / Reflections"}
+  ];
+  return [
+    {key:"dashboard", icon:"🛂", label:"My Passport"},
+    {key:"journey", icon:"🧭", label:"My Journey"},
+    {key:"reflection", icon:"💬", label:"Feedback / แบบสะท้อน"}
+  ];
+}
+function roleLabel(role){
+  return {hr:"HR Admin", supervisor:"หัวหน้างาน/พี่เลี้ยง", employee:"พนักงานใหม่"}[role] || role;
+}
+function renderShell(session){
+  const items = navItemsFor(session.role);
+  const navHtml = items.map(it => `
+    <div class="nav-item ${STATE.route===it.key?'active':''}" data-nav="${it.key}">
+      <span>${it.icon}</span><span>${it.label}</span>
+    </div>`).join("");
+  let headerName = session.name;
+  if(session.role === "employee"){
+    const emp = DB.employees.find(e=>e.id===session.employeeId);
+    headerName = emp ? emp.fullName : "พนักงาน";
+  }
+  return `
+  <div id="shell">
+    <div class="sidebar ${STATE.sidebarOpen?'open':''}" id="sidebar">
+      <div class="brand">
+        <div class="mark">AT</div>
+        <div class="txt">AT Passport<small>Onboarding & Probation</small></div>
+      </div>
+      ${navHtml}
+      <div class="side-foot">${roleLabel(session.role)}<br>${escapeHtml(headerName||"")}</div>
+      <button class="btn btn-ghost btn-sm mt-8" id="logout-btn" style="justify-content:center;">ออกจากระบบ</button>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div class="flex gap-10">
+          <button class="burger" id="burger-btn">☰</button>
+          <h2 id="page-title"></h2>
+        </div>
+        <div class="flex gap-10">
+          <div class="avatar">${(headerName||"?").slice(0,1)}</div>
+        </div>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+  </div>`;
+}
+function bindShell(session){
+  document.getElementById("burger-btn")?.addEventListener("click", ()=>{
+    STATE.sidebarOpen = !STATE.sidebarOpen;
+    document.getElementById("sidebar").classList.toggle("open", STATE.sidebarOpen);
+  });
+  document.getElementById("logout-btn").onclick = ()=>{ clearSession(); STATE.route="dashboard"; render(); };
+  document.querySelectorAll("[data-nav]").forEach(el=>{
+    el.onclick = ()=>{
+      STATE.route = el.dataset.nav; STATE.sidebarOpen=false; STATE.params={};
+      render();
+    };
+  });
+}
+
+/* ---------------------- Route dispatch ---------------------- */
+function renderRoute(session){
+  const content = document.getElementById("content");
+  const titleMap = {
+    dashboard: session.role==="hr" ? "HR Dashboard" : session.role==="supervisor" ? "Team Onboarding" : "My Passport",
+    employees:"Employee Management", templates:"Journey Template", reports:"Reports & Analytics",
+    settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน"
+  };
+  document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
+
+  if(session.role === "hr"){
+    if(STATE.route==="dashboard") content.innerHTML = renderHRDashboard();
+    else if(STATE.route==="employees") content.innerHTML = renderEmployeeManagement();
+    else if(STATE.route==="templates") content.innerHTML = renderTemplates();
+    else if(STATE.route==="reports") content.innerHTML = renderReports();
+    else if(STATE.route==="settings") content.innerHTML = renderSettings();
+    bindAfterRoute(session);
+  } else if(session.role === "supervisor"){
+    if(STATE.route==="dashboard") content.innerHTML = renderSupervisorTeam(session);
+    else if(STATE.route==="approval") content.innerHTML = renderSupervisorApproval(session);
+    bindAfterRoute(session);
+  } else {
+    const emp = DB.employees.find(e=>e.id===session.employeeId);
+    if(!emp){ content.innerHTML = `<div class="card">ไม่พบข้อมูลพนักงาน</div>`; return; }
+    if(STATE.route==="dashboard") content.innerHTML = renderEmployeePassport(emp);
+    else if(STATE.route==="journey") content.innerHTML = renderEmployeeJourney(emp);
+    else if(STATE.route==="reflection") content.innerHTML = renderEmployeeReflection(emp);
+    bindAfterRoute(session);
+  }
+}
+
+/* =========================================================================
+   HR ADMIN VIEWS
+   ========================================================================= */
+function renderHRDashboard(){
+  const emps = DB.employees;
+  const active = emps.filter(e=>e.status==="active");
+  const avgProgress = active.length ? Math.round(active.reduce((s,e)=>s+employeeProgress(e),0)/active.length) : 0;
+  const nearDue = active.filter(e=>{
+    const end = employeeEndDate(e);
+    return end && daysBetween(today(), end) <= 10 && daysBetween(today(), end) >= 0;
+  });
+  return `
+  <div class="grid grid-4">
+    <div class="card"><div class="muted small">พนักงานอยู่ระหว่าง Onboarding</div><h1>${active.length}</h1></div>
+    <div class="card"><div class="muted small">ความคืบหน้าเฉลี่ย</div><h1>${avgProgress}%</h1></div>
+    <div class="card"><div class="muted small">ใกล้ครบกำหนดทดลองงาน (≤10 วัน)</div><h1>${nearDue.length}</h1></div>
+    <div class="card"><div class="muted small">Template ที่ใช้งานอยู่</div><h1>${DB.templates.length}</h1></div>
+  </div>
+  <div class="section-title">พนักงานที่กำลังติดตาม</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>ชื่อ</th><th>ตำแหน่ง/แผนก</th><th>เริ่มงาน</th><th>วันที่</th><th>ความคืบหน้า</th><th>สถานะ</th></tr></thead>
+      <tbody>
+        ${active.length ? active.map(e=>{
+          const m = employeeMilestone(e); const p = employeeProgress(e);
+          return `<tr>
+            <td><b>${escapeHtml(e.fullName||"-")}</b><div class="small muted">${escapeHtml(e.employeeCode||"")}</div></td>
+            <td>${escapeHtml(e.position||"-")}<div class="small muted">${escapeHtml(e.department||"-")}</div></td>
+            <td>${fmtDate(e.startDate)}</td>
+            <td>วันที่ ${employeeDayNumber(e)} / ${e.durationDays}</td>
+            <td><div class="progress-track" style="width:110px;"><div class="progress-fill" style="width:${p}%"></div></div><span class="small muted">${p}%</span></td>
+            <td><span class="pill pill-gray">${m.label}</span></td>
+          </tr>`;
+        }).join("") : `<tr><td colspan="6" class="muted">ยังไม่มีพนักงาน — ไปที่ Employee Management เพื่อเพิ่ม</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderEmployeeManagement(){
+  const emps = DB.employees;
+  return `
+  <div class="flex-between mt-8">
+    <div></div>
+    <button class="btn btn-primary" id="add-emp-btn">+ เพิ่มพนักงานใหม่</button>
+  </div>
+  <div class="card mt-16">
+    <table>
+      <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ตำแหน่ง / แผนก</th><th>Template</th><th>เริ่มงาน</th><th>ครบกำหนด</th><th>ความคืบหน้า</th><th></th></tr></thead>
+      <tbody>
+      ${emps.length ? emps.map(e=>{
+        const tpl = DB.templates.find(t=>t.id===e.templateId);
+        const p = employeeProgress(e);
+        return `<tr>
+          <td>${escapeHtml(e.employeeCode||"-")}</td>
+          <td><b>${escapeHtml(e.fullName||"(ยังไม่กรอกชื่อ)")}</b></td>
+          <td>${escapeHtml(e.position||"-")}<div class="small muted">${escapeHtml(e.department||"-")}</div></td>
+          <td class="small">${tpl?escapeHtml(tpl.name):"-"}</td>
+          <td>${fmtDate(e.startDate)}</td>
+          <td>${fmtDate(employeeEndDate(e))}<div class="small muted">${e.durationDays} วัน</div></td>
+          <td>${p}%</td>
+          <td class="flex gap-8">
+            <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">แก้ไข</button>
+            <button class="btn btn-danger btn-sm" data-del-emp="${e.id}">ลบ</button>
+          </td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="8" class="muted">ยังไม่มีพนักงาน</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderEmployeeFormModal(empId){
+  const isNew = !empId;
+  const tpl0 = DB.templates[0];
+  const emp = isNew ? newEmployeeFromTemplate(tpl0) : DB.employees.find(e=>e.id===empId);
+  const tplOpts = DB.templates.map(t=>`<option value="${t.id}" ${t.id===emp.templateId?'selected':''}>${escapeHtml(t.name)} (${t.durationDays} วัน)</option>`).join("");
+  return `
+  <div class="modal-overlay" id="emp-modal-overlay">
+    <div class="modal modal-wide">
+      <h3>${isNew?"เพิ่มพนักงานใหม่":"แก้ไขข้อมูลพนักงาน"}</h3>
+      <div class="grid grid-3 mt-16">
+        <label class="field">ชื่อ-นามสกุล <input id="ef-name" value="${escapeHtml(emp.fullName)}"></label>
+        <label class="field">ชื่อเล่น <input id="ef-nick" value="${escapeHtml(emp.nickname)}"></label>
+        <label class="field">รหัสพนักงาน <input id="ef-code" value="${escapeHtml(emp.employeeCode)}"></label>
+        <label class="field">ตำแหน่ง <input id="ef-position" value="${escapeHtml(emp.position)}"></label>
+        <label class="field">แผนก/ทีม <input id="ef-dept" value="${escapeHtml(emp.department)}"></label>
+        <label class="field">วันเริ่มงาน <input id="ef-start" type="date" value="${emp.startDate}"></label>
+      </div>
+      <label class="field">Journey Template
+        <select id="ef-template">${tplOpts}</select>
+      </label>
+      <label class="field">ระยะเวลาทดลองงาน (วัน) — ค่าเริ่มต้นจาก Template แก้ไขเฉพาะคนนี้ได้
+        <input id="ef-duration" type="number" min="1" value="${emp.durationDays}">
+      </label>
+      <div class="section-title">คนที่พึ่งได้</div>
+      <div class="grid grid-3">
+        <label class="field">พี่เลี้ยง — ชื่อ <input id="ef-mentor-name" value="${escapeHtml(emp.mentor.name)}"></label>
+        <label class="field">พี่เลี้ยง — ตำแหน่ง <input id="ef-mentor-pos" value="${escapeHtml(emp.mentor.position)}"></label>
+        <label class="field">พี่เลี้ยง — โทร/LINE <input id="ef-mentor-phone" value="${escapeHtml(emp.mentor.phone)}"></label>
+        <label class="field">หัวหน้าโดยตรง — ชื่อ <input id="ef-sup-name" value="${escapeHtml(emp.supervisor.name)}"></label>
+        <label class="field">หัวหน้าโดยตรง — ตำแหน่ง <input id="ef-sup-pos" value="${escapeHtml(emp.supervisor.position)}"></label>
+        <label class="field">หัวหน้าโดยตรง — โทร/LINE <input id="ef-sup-phone" value="${escapeHtml(emp.supervisor.phone)}"></label>
+        <label class="field">HR ผู้ดูแล — ชื่อ <input id="ef-hr-name" value="${escapeHtml(emp.hrContact.name)}"></label>
+        <label class="field">HR ผู้ดูแล — ตำแหน่ง <input id="ef-hr-pos" value="${escapeHtml(emp.hrContact.position)}"></label>
+        <label class="field">HR ผู้ดูแล — โทร/LINE <input id="ef-hr-phone" value="${escapeHtml(emp.hrContact.phone)}"></label>
+      </div>
+      <div class="flex-between mt-16">
+        <button class="btn btn-ghost" id="emp-cancel-btn">ยกเลิก</button>
+        <button class="btn btn-primary" id="emp-save-btn">${isNew?"เพิ่มพนักงาน":"บันทึกการแก้ไข"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTemplates(){
+  return `
+  <div class="flex-between">
+    <p class="muted small" style="max-width:640px;">สร้าง Template แยกตามแผนก/ระดับตำแหน่ง พร้อมกำหนดระยะเวลาทดลองงานเริ่มต้น (ค่าเริ่มต้นระบบ 119 วัน แก้ไขต่อ Template หรือต่อพนักงานแต่ละคนได้)</p>
+    <button class="btn btn-primary" id="add-tpl-btn">+ สร้าง Template</button>
+  </div>
+  <div class="grid grid-2 mt-16">
+    ${DB.templates.map(t=>{
+      const itemCount = Object.values(t.checklist).reduce((s,ph)=>s+ph.items.length,0);
+      return `<div class="card">
+        <div class="flex-between">
+          <div><h3>${escapeHtml(t.name)}</h3><div class="small muted">${escapeHtml(t.department)} · ${escapeHtml(t.positionLevel)}</div></div>
+          <span class="badge">${t.durationDays} วัน</span>
+        </div>
+        <div class="small muted mt-8">${itemCount} รายการ Checklist · ${t.kpi.length} ตัวชี้วัด KPI · ${t.reflectionRounds.length} รอบแบบสะท้อน</div>
+        <div class="flex gap-8 mt-16">
+          <button class="btn btn-ghost btn-sm" data-edit-tpl="${t.id}">แก้ไข Template</button>
+          <button class="btn btn-danger btn-sm" data-del-tpl="${t.id}" ${DB.employees.some(e=>e.templateId===t.id)?'disabled title="มีพนักงานใช้ template นี้อยู่"':''}>ลบ</button>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function renderTemplateFormModal(tplId){
+  const isNew = !tplId;
+  const tpl = isNew ? {
+    id: uid("tpl"), name:"", department:"", positionLevel:"", durationDays:119,
+    checklist: defaultChecklist(), kpi: defaultKPI(), reflectionRounds: defaultReflectionRounds()
+  } : JSON.parse(JSON.stringify(DB.templates.find(t=>t.id===tplId)));
+
+  const phaseBlocks = Object.entries(tpl.checklist).map(([key,ph])=>`
+    <div class="card" style="margin-bottom:10px;">
+      <div class="flex-between">
+        <input data-phase-title="${key}" value="${escapeHtml(ph.title)}" style="font-weight:700;border:none;padding:0;font-size:14px;">
+      </div>
+      <div id="phase-items-${key}">
+        ${ph.items.map((item,i)=>`
+          <div class="flex gap-8 mt-8" data-phase-item-row="${key}:${i}">
+            <input value="${escapeHtml(item)}" data-phase-item="${key}:${i}" style="flex:1;">
+            <button class="btn btn-ghost btn-sm" data-remove-item="${key}:${i}">ลบ</button>
+          </div>`).join("")}
+      </div>
+      <button class="btn btn-ghost btn-sm mt-8" data-add-item="${key}">+ เพิ่มรายการ</button>
+    </div>`).join("");
+
+  return `
+  <div class="modal-overlay" id="tpl-modal-overlay">
+    <div class="modal modal-wide">
+      <h3>${isNew?"สร้าง Journey Template":"แก้ไข Template"}</h3>
+      <div class="grid grid-2 mt-16">
+        <label class="field">ชื่อ Template <input id="tf-name" value="${escapeHtml(tpl.name)}" placeholder="เช่น ช่างเทคนิค - Asset Reliability"></label>
+        <label class="field">ระยะเวลาทดลองงานเริ่มต้น (วัน) <input id="tf-duration" type="number" min="1" value="${tpl.durationDays}"></label>
+        <label class="field">แผนก / สายงาน <input id="tf-dept" value="${escapeHtml(tpl.department)}"></label>
+        <label class="field">ระดับตำแหน่ง <input id="tf-level" value="${escapeHtml(tpl.positionLevel)}"></label>
+      </div>
+      <div class="section-title">Onboarding Checklist ตามเฟส</div>
+      <div id="tpl-phase-container" data-tpl-draft='${escapeHtml(JSON.stringify(tpl))}'>${phaseBlocks}</div>
+      <div class="flex-between mt-16">
+        <button class="btn btn-ghost" id="tpl-cancel-btn">ยกเลิก</button>
+        <button class="btn btn-primary" id="tpl-save-btn">${isNew?"สร้าง Template":"บันทึก"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderReports(){
+  const emps = DB.employees;
+  const byDept = {};
+  emps.forEach(e=>{
+    byDept[e.department] = byDept[e.department] || {count:0, progress:0};
+    byDept[e.department].count++;
+    byDept[e.department].progress += employeeProgress(e);
+  });
+  const rows = Object.entries(byDept).map(([dept,v])=>`
+    <tr><td>${escapeHtml(dept)}</td><td>${v.count}</td><td>${Math.round(v.progress/v.count)}%</td></tr>`).join("");
+  return `
+  <div class="card">
+    <h3>ภาพรวมตามแผนก</h3>
+    <table class="mt-8"><thead><tr><th>แผนก</th><th>จำนวนพนักงาน</th><th>ความคืบหน้าเฉลี่ย</th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>`}</tbody></table>
+  </div>
+  <div class="card mt-16">
+    <h3>รายละเอียดแบบสะท้อน 2 ทางที่ส่งเข้ามา</h3>
+    <table class="mt-8">
+      <thead><tr><th>พนักงาน</th><th>รอบ</th><th>สถานะ</th></tr></thead>
+      <tbody>
+        ${emps.flatMap(e => e.reflectionRounds.map(r=>{
+          const rec = e.reflections[r.round];
+          const status = rec && rec.employee ? (rec.mentor ? '<span class="pill pill-green">ครบทั้งสองฝ่าย</span>' : '<span class="pill pill-amber">รอพี่เลี้ยงตอบ</span>') : '<span class="pill pill-gray">ยังไม่ส่ง</span>';
+          return `<tr><td>${escapeHtml(e.fullName||"-")}</td><td>${escapeHtml(r.label)}</td><td>${status}</td></tr>`;
+        })).join("") || `<tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderSettings(){
+  return `
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>ข้อมูลองค์กร</h3>
+      <label class="field mt-16">ชื่อระบบ <input id="set-sysname" value="${escapeHtml(DB.org.systemName)}"></label>
+      <label class="field">หน่วยงานที่รับผิดชอบ <input id="set-unit" value="${escapeHtml(DB.org.unit)}"></label>
+      <label class="field">บริษัท (คั่นด้วยเครื่องหมาย ;) <textarea id="set-companies">${escapeHtml(DB.org.companies.join("; "))}</textarea></label>
+      <button class="btn btn-primary" id="save-org-btn">บันทึก</button>
+    </div>
+    <div class="card">
+      <h3>รหัสผ่านผู้ดูแลระบบ</h3>
+      <label class="field mt-16">รหัสผ่าน HR Admin <input id="set-hr-pin" value="${escapeHtml(DB.users.find(u=>u.role==='hr').pin)}"></label>
+      <label class="field">รหัสผ่าน หัวหน้างาน/พี่เลี้ยง (ใช้ร่วมกันทั้งทีม) <input id="set-sup-pin" value="${escapeHtml(DB.users.find(u=>u.role==='supervisor').pin)}"></label>
+      <button class="btn btn-primary" id="save-pins-btn">บันทึก</button>
+      <div class="section-title">ฐานข้อมูล Google Sheet</div>
+      <p class="small muted">ข้อมูลทั้งหมดเก็บอยู่ใน Google Sheet ที่เชื่อมต่อไว้ ทุกคนที่ใช้ URL เดียวกันนี้เห็นข้อมูลชุดเดียวกัน (อัปเดตให้อัตโนมัติทุก ~4 วินาที)</p>
+      <div class="small mt-8" style="word-break:break-all;"><b>URL ปัจจุบัน:</b> ${escapeHtml(API_URL)}</div>
+      <div class="flex gap-8 mt-8">
+        <button class="btn btn-ghost btn-sm" id="export-btn">⬇️ ดาวน์โหลดสำเนาข้อมูล (JSON)</button>
+        <button class="btn btn-ghost btn-sm" id="change-db-btn">🔄 เปลี่ยน URL ฐานข้อมูล</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   SUPERVISOR VIEWS
+   ========================================================================= */
+function renderSupervisorTeam(session){
+  const nameKey = (session.name||"").trim();
+  const team = DB.employees.filter(e => !nameKey || e.supervisor.name.includes(nameKey) || e.mentor.name.includes(nameKey) || true);
+  // Without real auth we show all employees but label clearly; filter box lets supervisor narrow to their own name.
+  return `
+  <div class="card">
+    <label class="field">กรองเฉพาะทีมของฉัน (พิมพ์ชื่อหัวหน้า/พี่เลี้ยงตามที่ตั้งไว้ในระบบ)
+      <input id="team-filter" placeholder="เช่น คุณสรศักดิ์ ประจำเมือง" value="${escapeHtml(session.name||'')}">
+    </label>
+  </div>
+  <div id="team-list" class="mt-16"></div>`;
+}
+function renderTeamList(filterText){
+  const f = (filterText||"").trim();
+  const list = DB.employees.filter(e => !f || e.supervisor.name.includes(f) || e.mentor.name.includes(f));
+  if(!list.length) return `<div class="card muted">ไม่พบพนักงานที่ตรงกับชื่อนี้ — ลองเว้นว่างเพื่อดูทั้งหมด</div>`;
+  return list.map(e=>{
+    const p = employeeProgress(e); const m = employeeMilestone(e);
+    return `<div class="card mt-16">
+      <div class="flex-between">
+        <div><h3>${escapeHtml(e.fullName||"-")}</h3><div class="small muted">${escapeHtml(e.position)} · ${escapeHtml(e.department)} · เริ่มงาน ${fmtDate(e.startDate)}</div></div>
+        <span class="pill pill-gray">${m.label}</span>
+      </div>
+      <div class="progress-track mt-8"><div class="progress-fill" style="width:${p}%"></div></div>
+      <div class="small muted mt-8">ความคืบหน้า ${p}% · วันที่ ${employeeDayNumber(e)}/${e.durationDays}</div>
+      <button class="btn btn-ghost btn-sm mt-8" data-open-checklist="${e.id}">เปิด Onboarding Checklist</button>
+    </div>`;
+  }).join("");
+}
+
+function renderSupervisorApproval(session){
+  const items = [];
+  DB.employees.forEach(e=>{
+    e.reflectionRounds.forEach(r=>{
+      const rec = e.reflections[r.round];
+      if(rec && rec.employee && !rec.mentor){
+        items.push({emp:e, round:r});
+      }
+    });
+  });
+  return `
+  <div class="section-title">แบบสะท้อนที่รอพี่เลี้ยง/หัวหน้างานตอบ</div>
+  ${items.length ? items.map(it=>`
+    <div class="card mt-16">
+      <div class="flex-between">
+        <div><b>${escapeHtml(it.emp.fullName)}</b><div class="small muted">${escapeHtml(it.round.label)}</div></div>
+        <button class="btn btn-primary btn-sm" data-answer-mentor="${it.emp.id}:${it.round.round}">ตอบแบบสะท้อน</button>
+      </div>
+    </div>`).join("") : `<div class="card muted">ไม่มีรายการรอตอบในขณะนี้</div>`}
+  `;
+}
+
+/* =========================================================================
+   EMPLOYEE VIEWS
+   ========================================================================= */
+function renderEmployeePassport(emp){
+  const p = employeeProgress(emp);
+  const end = employeeEndDate(emp);
+  return `
+  <div class="passport-cover">
+    <div class="tag">New Hire Passport</div>
+    <h1>${escapeHtml(emp.fullName||"-")} ${emp.nickname?`(${escapeHtml(emp.nickname)})`:""}</h1>
+    <div class="meta">${escapeHtml(emp.position||"-")} · ${escapeHtml(emp.department||"-")}</div>
+    <div class="meta">เริ่มงาน ${fmtDate(emp.startDate)} · ครบกำหนด ${emp.durationDays} วัน (${fmtDate(end)})</div>
+    <div class="timeline"><div class="seg"><b style="width:${p}%"></b></div></div>
+    <div class="meta mt-8">ความคืบหน้า ${p}% · วันที่ ${employeeDayNumber(emp)} จาก ${emp.durationDays} วัน</div>
+  </div>
+
+  <div class="section-title">คนที่พึ่งได้ — ติดอะไรถามใคร</div>
+  <div class="grid grid-3">
+    ${["mentor","supervisor","hrContact"].map(k=>{
+      const labels = {mentor:"พี่เลี้ยง", supervisor:"หัวหน้าโดยตรง", hrContact:"HR ผู้ดูแล"};
+      const c = emp[k];
+      return `<div class="card">
+        <div class="small muted">${labels[k]}</div>
+        <h3>${escapeHtml(c.name||"-")}</h3>
+        <div class="small muted">${escapeHtml(c.position||"-")}</div>
+        <div class="small mt-8">${escapeHtml(c.phone||"-")}</div>
+      </div>`;
+    }).join("")}
+  </div>
+
+  <div class="section-title">รหัสพนักงาน / ข้อมูลพื้นฐาน</div>
+  <div class="card">
+    <table>
+      <tr><th>รหัสพนักงาน</th><td>${escapeHtml(emp.employeeCode||"-")}</td></tr>
+      <tr><th>วันเริ่มงาน</th><td>${fmtDate(emp.startDate)}</td></tr>
+      <tr><th>วันครบกำหนดทดลองงาน</th><td>${fmtDate(end)}</td></tr>
+    </table>
+  </div>`;
+}
+
+function renderEmployeeJourney(emp){
+  const tabs = Object.entries(emp.checklist);
+  STATE.params.activePhase = STATE.params.activePhase || tabs[0][0];
+  const tabHtml = tabs.map(([key,ph])=>`<div class="tab ${STATE.params.activePhase===key?'active':''}" data-phase-tab="${key}">${escapeHtml(ph.title.split("·")[0].trim())}</div>`).join("");
+  const active = emp.checklist[STATE.params.activePhase];
+  const title = tabs.find(([k])=>k===STATE.params.activePhase)[1].title;
+  return `
+  <div class="card">
+    <div class="tabs">${tabHtml}</div>
+    <h3 class="mt-16">${escapeHtml(title)}</h3>
+    ${active.map(item=>`
+      <div class="checklist-row">
+        <div class="chk-box ${item.done?'done':''}" data-chk="${item.id}">${item.done?'✓':''}</div>
+        <div>
+          <div>${escapeHtml(item.label)}</div>
+          ${item.note?`<div class="small muted mt-8">หมายเหตุ: ${escapeHtml(item.note)}</div>`:""}
+        </div>
+        <div class="small muted">${item.date?fmtDate(item.date):""}</div>
+      </div>`).join("")}
+  </div>
+  <div class="section-title">ตัวชี้วัดช่วงทดลองงาน (KPI)</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>ตัววัด</th><th>เป้าหมาย</th><th>ดูจากที่ไหน</th></tr></thead>
+      <tbody>${emp.kpi.map(k=>`<tr><td>${escapeHtml(k.metric)}</td><td>${escapeHtml(k.target)}</td><td>${escapeHtml(k.source)}</td></tr>`).join("")}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderEmployeeReflection(emp){
+  return emp.reflectionRounds.map(r=>{
+    const rec = emp.reflections[r.round] || {};
+    const empDone = !!rec.employee;
+    const mentorDone = !!rec.mentor;
+    return `<div class="card mt-16">
+      <div class="flex-between">
+        <h3>${escapeHtml(r.label)}</h3>
+        <span class="pill ${empDone && mentorDone ? 'pill-green' : empDone ? 'pill-amber':'pill-gray'}">
+          ${empDone && mentorDone ? "ครบทั้งสองฝ่าย" : empDone ? "ส่งแล้ว — รอพี่เลี้ยง" : "ยังไม่ได้ทำ"}
+        </span>
+      </div>
+      ${empDone ? `<p class="small muted mt-8">คุณได้ส่งแบบสะท้อนรอบนี้แล้วเมื่อ ${fmtDate(rec.employeeDate)}</p>`
+        : `<button class="btn btn-primary btn-sm mt-16" data-fill-reflection="${r.round}">ทำแบบสะท้อนรอบนี้</button>`}
+    </div>`;
+  }).join("");
+}
+
+function renderReflectionFormModal(empId, round, who){
+  const emp = DB.employees.find(e=>e.id===empId);
+  const r = emp.reflectionRounds.find(x=>x.round==round);
+  const questions = who === "employee" ? EMPLOYEE_QUESTIONS : MENTOR_QUESTIONS;
+  return `
+  <div class="modal-overlay" id="refl-modal-overlay">
+    <div class="modal modal-wide">
+      <h3>แบบสะท้อน 2 ทาง — ${escapeHtml(r.label)}</h3>
+      <p class="small muted">${who==='employee' ? 'ส่วน ก · พนักงานใหม่ตอบ' : 'ส่วน ข · พี่เลี้ยง/หัวหน้างานตอบ'}</p>
+      ${questions.map((q,i)=>`
+        <div class="mt-16">
+          <div class="small" style="font-weight:600;">${i+1}. ${escapeHtml(q)}</div>
+          <div class="radio-row mt-8">
+            <label class="radio-opt"><input type="radio" name="rq${i}" value="yes" checked> ใช่</label>
+            <label class="radio-opt"><input type="radio" name="rq${i}" value="partial"> บางส่วน</label>
+            <label class="radio-opt"><input type="radio" name="rq${i}" value="no"> ไม่ใช่</label>
+          </div>
+          <input class="mt-8" data-rq-note="${i}" placeholder="ขยายความ (ถ้ามี)">
+        </div>`).join("")}
+      <label class="field mt-16">${who==='employee' ? 'สิ่งที่ยังไม่รู้ แต่อยากรู้สัปดาห์หน้า' : 'ข้อเสนอแนะเพิ่มเติม'}
+        <textarea id="refl-extra"></textarea>
+      </label>
+      <div class="flex-between mt-16">
+        <button class="btn btn-ghost" id="refl-cancel-btn">ยกเลิก</button>
+        <button class="btn btn-primary" id="refl-save-btn">ส่งแบบสะท้อน</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   BINDING LOGIC (after each route render)
+   ========================================================================= */
+function openModal(html){
+  MODAL_OPEN = true;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstElementChild);
+}
+function closeModal(id){
+  MODAL_OPEN = false;
+  document.getElementById(id)?.remove();
+}
+
+function bindAfterRoute(session){
+  // HR: employees
+  document.getElementById("add-emp-btn")?.addEventListener("click", ()=>{
+    if(!DB.templates.length){ toast("กรุณาสร้าง Journey Template อย่างน้อย 1 รายการก่อน"); return; }
+    openModal(renderEmployeeFormModal(null));
+    bindEmployeeFormModal(null);
+  });
+  document.querySelectorAll("[data-edit-emp]").forEach(el=>{
+    el.onclick = ()=>{ openModal(renderEmployeeFormModal(el.dataset.editEmp)); bindEmployeeFormModal(el.dataset.editEmp); };
+  });
+  document.querySelectorAll("[data-del-emp]").forEach(el=>{
+    el.onclick = async ()=>{
+      if(confirm("ยืนยันลบพนักงานคนนี้?")){
+        try{
+          await persistDeleteEmployee(el.dataset.delEmp);
+          DB.employees = DB.employees.filter(e=>e.id!==el.dataset.delEmp);
+          renderRoute(session); toast("ลบข้อมูลแล้ว");
+        }catch(e){ toast("ลบไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+      }
+    };
+  });
+
+  // HR: templates
+  document.getElementById("add-tpl-btn")?.addEventListener("click", ()=>{
+    openModal(renderTemplateFormModal(null)); bindTemplateFormModal(null);
+  });
+  document.querySelectorAll("[data-edit-tpl]").forEach(el=>{
+    el.onclick = ()=>{ openModal(renderTemplateFormModal(el.dataset.editTpl)); bindTemplateFormModal(el.dataset.editTpl); };
+  });
+  document.querySelectorAll("[data-del-tpl]").forEach(el=>{
+    el.onclick = async ()=>{
+      if(el.disabled) return;
+      if(confirm("ยืนยันลบ Template นี้?")){
+        try{
+          await persistDeleteTemplate(el.dataset.delTpl);
+          DB.templates = DB.templates.filter(t=>t.id!==el.dataset.delTpl);
+          renderRoute(session); toast("ลบ Template แล้ว");
+        }catch(e){ toast("ลบไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+      }
+    };
+  });
+
+  // HR: settings
+  document.getElementById("save-org-btn")?.addEventListener("click", async ()=>{
+    DB.org.systemName = document.getElementById("set-sysname").value.trim();
+    DB.org.unit = document.getElementById("set-unit").value.trim();
+    DB.org.companies = document.getElementById("set-companies").value.split(";").map(s=>s.trim()).filter(Boolean);
+    try{ await persistSettings(); toast("บันทึกแล้ว"); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  });
+  document.getElementById("save-pins-btn")?.addEventListener("click", async ()=>{
+    DB.users.find(u=>u.role==='hr').pin = document.getElementById("set-hr-pin").value.trim();
+    DB.users.find(u=>u.role==='supervisor').pin = document.getElementById("set-sup-pin").value.trim();
+    try{ await persistUsers(); toast("บันทึกแล้ว"); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  });
+  document.getElementById("export-btn")?.addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `at-onboarding-passport-backup-${today()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  document.getElementById("change-db-btn")?.addEventListener("click", ()=>{
+    if(confirm("ออกจากฐานข้อมูลปัจจุบันและไปตั้งค่า URL ใหม่?")){
+      API_CONNECTED = false; API_URL = "";
+      localStorage.removeItem(API_URL_KEY);
+      clearSession();
+      render();
+    }
+  });
+
+  // Supervisor
+  const teamFilter = document.getElementById("team-filter");
+  if(teamFilter){
+    const list = document.getElementById("team-list");
+    list.innerHTML = renderTeamList(teamFilter.value);
+    teamFilter.addEventListener("input", ()=>{ list.innerHTML = renderTeamList(teamFilter.value); bindChecklistOpeners(session); });
+    bindChecklistOpeners(session);
+  }
+  document.querySelectorAll("[data-answer-mentor]").forEach(el=>{
+    el.onclick = ()=>{
+      const [empId, round] = el.dataset.answerMentor.split(":");
+      openModal(renderReflectionFormModal(empId, round, "mentor"));
+      bindReflectionModal(empId, round, "mentor", session);
+    };
+  });
+
+  // Employee
+  document.querySelectorAll("[data-phase-tab]").forEach(el=>{
+    el.onclick = ()=>{ STATE.params.activePhase = el.dataset.phaseTab; renderRoute(session); };
+  });
+  document.querySelectorAll("[data-chk]").forEach(el=>{
+    el.onclick = async ()=>{
+      const emp = DB.employees.find(e=>e.id===session.employeeId);
+      for(const k in emp.checklist){
+        const item = emp.checklist[k].find(i=>i.id===el.dataset.chk);
+        if(item){
+          item.done = !item.done;
+          item.date = item.done ? today() : "";
+          renderRoute(session);
+          try{ await persistEmployee(emp); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+          return;
+        }
+      }
+    };
+  });
+  document.querySelectorAll("[data-fill-reflection]").forEach(el=>{
+    el.onclick = ()=>{
+      openModal(renderReflectionFormModal(session.employeeId, el.dataset.fillReflection, "employee"));
+      bindReflectionModal(session.employeeId, el.dataset.fillReflection, "employee", session);
+    };
+  });
+}
+
+function bindChecklistOpeners(session){
+  document.querySelectorAll("[data-open-checklist]").forEach(el=>{
+    el.onclick = ()=>{
+      const emp = DB.employees.find(e=>e.id===el.dataset.openChecklist);
+      openModal(renderSupervisorChecklistModal(emp));
+      bindSupervisorChecklistModal(emp, session);
+    };
+  });
+}
+
+function renderSupervisorChecklistModal(emp){
+  const blocks = Object.entries(emp.checklist).map(([key,items])=>{
+    const ph = DB.templates.find(t=>t.id===emp.templateId)?.checklist[key];
+    return `<div class="section-title">${escapeHtml(ph?ph.title:key)}</div>
+      ${items.map(item=>`
+        <div class="checklist-row">
+          <div class="chk-box ${item.done?'done':''}" data-s-chk="${item.id}">${item.done?'✓':''}</div>
+          <div>
+            <div>${escapeHtml(item.label)}</div>
+            <input class="mt-8" placeholder="บันทึกปัญหาที่พบ / รายละเอียดเพิ่มเติม" data-s-note="${item.id}" value="${escapeHtml(item.note)}">
+          </div>
+          <div class="small muted">${item.date?fmtDate(item.date):""}</div>
+        </div>`).join("")}`;
+  }).join("");
+  return `
+  <div class="modal-overlay" id="s-chk-modal-overlay">
+    <div class="modal modal-wide">
+      <div class="flex-between"><h3>${escapeHtml(emp.fullName)} — Onboarding Checklist</h3>
+        <button class="btn btn-ghost btn-sm" id="s-chk-close">ปิด</button></div>
+      ${blocks}
+    </div>
+  </div>`;
+}
+function bindSupervisorChecklistModal(emp, session){
+  MODAL_OPEN = true;
+  document.getElementById("s-chk-close").onclick = ()=>{ MODAL_OPEN = false; closeModal("s-chk-modal-overlay"); };
+  document.querySelectorAll("[data-s-chk]").forEach(el=>{
+    el.onclick = async ()=>{
+      for(const k in emp.checklist){
+        const item = emp.checklist[k].find(i=>i.id===el.dataset.sChk);
+        if(item){
+          item.done = !item.done; item.date = item.done?today():"";
+          closeModal("s-chk-modal-overlay");
+          openModal(renderSupervisorChecklistModal(emp)); bindSupervisorChecklistModal(emp, session);
+          try{ await persistEmployee(emp); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+          return;
+        }
+      }
+    };
+  });
+  document.querySelectorAll("[data-s-note]").forEach(el=>{
+    el.addEventListener("change", async ()=>{
+      for(const k in emp.checklist){
+        const item = emp.checklist[k].find(i=>i.id===el.dataset.sNote);
+        if(item){
+          item.note = el.value;
+          try{ await persistEmployee(emp); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+          return;
+        }
+      }
+    });
+  });
+}
+
+function bindEmployeeFormModal(empId){
+  document.getElementById("emp-cancel-btn").onclick = ()=>closeModal("emp-modal-overlay");
+  document.getElementById("ef-template").onchange = (e)=>{
+    const tpl = DB.templates.find(t=>t.id===e.target.value);
+    document.getElementById("ef-duration").value = tpl.durationDays;
+  };
+  document.getElementById("emp-save-btn").onclick = async ()=>{
+    const tplId = document.getElementById("ef-template").value;
+    const tpl = DB.templates.find(t=>t.id===tplId);
+    let emp = empId ? DB.employees.find(e=>e.id===empId) : newEmployeeFromTemplate(tpl);
+    if(empId && emp.templateId !== tplId){
+      // switching template on an existing employee rebuilds checklist/kpi from new template
+      emp.checklist = buildChecklistState(tpl.checklist);
+      emp.kpi = tpl.kpi.map(k=>({...k, notes:""}));
+      emp.reflectionRounds = tpl.reflectionRounds;
+    }
+    emp.templateId = tplId;
+    emp.fullName = document.getElementById("ef-name").value.trim();
+    emp.nickname = document.getElementById("ef-nick").value.trim();
+    emp.employeeCode = document.getElementById("ef-code").value.trim();
+    emp.position = document.getElementById("ef-position").value.trim();
+    emp.department = document.getElementById("ef-dept").value.trim();
+    emp.startDate = document.getElementById("ef-start").value || today();
+    emp.durationDays = parseInt(document.getElementById("ef-duration").value) || tpl.durationDays;
+    emp.mentor = {name:val("ef-mentor-name"),position:val("ef-mentor-pos"),phone:val("ef-mentor-phone"),line:""};
+    emp.supervisor = {name:val("ef-sup-name"),position:val("ef-sup-pos"),phone:val("ef-sup-phone"),line:""};
+    emp.hrContact = {name:val("ef-hr-name"),position:val("ef-hr-pos"),phone:val("ef-hr-phone"),line:""};
+    const saveBtn = document.getElementById("emp-save-btn"); saveBtn.disabled = true;
+    try{
+      await persistEmployee(emp);
+      if(!empId) DB.employees.push(emp);
+      closeModal("emp-modal-overlay");
+      renderRoute(getSession());
+      toast("บันทึกข้อมูลพนักงานแล้ว");
+    }catch(e){ saveBtn.disabled = false; toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+  function val(id){ return document.getElementById(id).value.trim(); }
+}
+
+function bindTemplateFormModal(tplId){
+  const container = document.getElementById("tpl-phase-container");
+  let draft = JSON.parse(container.dataset.tplDraft);
+
+  function refreshPhaseBlocks(){
+    const phaseBlocks = Object.entries(draft.checklist).map(([key,ph])=>`
+      <div class="card" style="margin-bottom:10px;">
+        <input data-phase-title="${key}" value="${escapeHtml(ph.title)}" style="font-weight:700;border:none;padding:0;font-size:14px;width:100%;">
+        <div id="phase-items-${key}">
+          ${ph.items.map((item,i)=>`
+            <div class="flex gap-8 mt-8">
+              <input value="${escapeHtml(item)}" data-phase-item="${key}:${i}" style="flex:1;">
+              <button class="btn btn-ghost btn-sm" data-remove-item="${key}:${i}">ลบ</button>
+            </div>`).join("")}
+        </div>
+        <button class="btn btn-ghost btn-sm mt-8" data-add-item="${key}">+ เพิ่มรายการ</button>
+      </div>`).join("");
+    container.innerHTML = phaseBlocks;
+    bindPhaseEvents();
+  }
+  function bindPhaseEvents(){
+    container.querySelectorAll("[data-phase-title]").forEach(el=>{
+      el.addEventListener("change", ()=>{ draft.checklist[el.dataset.phaseTitle].title = el.value; });
+    });
+    container.querySelectorAll("[data-phase-item]").forEach(el=>{
+      el.addEventListener("change", ()=>{
+        const [key,i] = el.dataset.phaseItem.split(":");
+        draft.checklist[key].items[+i] = el.value;
+      });
+    });
+    container.querySelectorAll("[data-remove-item]").forEach(el=>{
+      el.onclick = ()=>{
+        const [key,i] = el.dataset.removeItem.split(":");
+        draft.checklist[key].items.splice(+i,1);
+        refreshPhaseBlocks();
+      };
+    });
+    container.querySelectorAll("[data-add-item]").forEach(el=>{
+      el.onclick = ()=>{
+        draft.checklist[el.dataset.addItem].items.push("รายการใหม่");
+        refreshPhaseBlocks();
+      };
+    });
+  }
+  bindPhaseEvents();
+
+  document.getElementById("tpl-cancel-btn").onclick = ()=>closeModal("tpl-modal-overlay");
+  document.getElementById("tpl-save-btn").onclick = async ()=>{
+    draft.name = document.getElementById("tf-name").value.trim();
+    draft.durationDays = parseInt(document.getElementById("tf-duration").value) || 119;
+    draft.department = document.getElementById("tf-dept").value.trim();
+    draft.positionLevel = document.getElementById("tf-level").value.trim();
+    if(!draft.name){ toast("กรุณาตั้งชื่อ Template"); return; }
+    const saveBtn = document.getElementById("tpl-save-btn"); saveBtn.disabled = true;
+    try{
+      await persistTemplate(draft);
+      const idx = DB.templates.findIndex(t=>t.id===draft.id);
+      if(idx>=0) DB.templates[idx] = draft; else DB.templates.push(draft);
+      closeModal("tpl-modal-overlay");
+      renderRoute(getSession());
+      toast("บันทึก Template แล้ว");
+    }catch(e){ saveBtn.disabled = false; toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+}
+
+function bindReflectionModal(empId, round, who, session){
+  document.getElementById("refl-cancel-btn").onclick = ()=>closeModal("refl-modal-overlay");
+  document.getElementById("refl-save-btn").onclick = async ()=>{
+    const emp = DB.employees.find(e=>e.id===empId);
+    const questions = who === "employee" ? EMPLOYEE_QUESTIONS : MENTOR_QUESTIONS;
+    const answers = questions.map((q,i)=>{
+      const sel = document.querySelector(`input[name="rq${i}"]:checked`);
+      return { q, answer: sel ? sel.value : "yes", note: document.querySelector(`[data-rq-note="${i}"]`).value.trim() };
+    });
+    const extra = document.getElementById("refl-extra").value.trim();
+    emp.reflections[round] = emp.reflections[round] || {};
+    if(who === "employee"){
+      emp.reflections[round].employee = answers;
+      emp.reflections[round].employeeExtra = extra;
+      emp.reflections[round].employeeDate = today();
+    } else {
+      emp.reflections[round].mentor = answers;
+      emp.reflections[round].mentorExtra = extra;
+      emp.reflections[round].mentorDate = today();
+    }
+    const saveBtn = document.getElementById("refl-save-btn"); saveBtn.disabled = true;
+    try{
+      await persistEmployee(emp);
+      closeModal("refl-modal-overlay");
+      renderRoute(session);
+      toast("บันทึกแบบสะท้อนแล้ว");
+    }catch(e){ saveBtn.disabled = false; toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+(async function init(){
+  if(API_URL){
+    try{
+      await refreshDB();
+      API_CONNECTED = true;
+      startPolling();
+    }catch(e){
+      API_CONNECTED = false;
+      toast("เชื่อมต่อฐานข้อมูลเดิมไม่สำเร็จ กรุณาตั้งค่าใหม่");
+    }
+  }
+  render();
+})();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
