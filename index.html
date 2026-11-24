@@ -2637,13 +2637,16 @@ function renderSupervisorChecklistModal(emp){
     const ph = DB.templates.find(t=>t.id===emp.templateId)?.checklist[key];
     return `<div class="section-title">${escapeHtml(ph?ph.title:key)}</div>
       ${items.map(item=>`
-        <div class="checklist-row">
+        <div class="checklist-row" data-row="${item.id}">
           <div class="chk-box ${item.done?'done':''}" data-s-chk="${item.id}">${item.done?'✓':''}</div>
           <div>
             <div>${escapeHtml(item.label)}</div>
-            <input class="mt-8" placeholder="บันทึกปัญหาที่พบ / รายละเอียดเพิ่มเติม" data-s-note="${item.id}" value="${escapeHtml(item.note)}">
+            <input class="mt-8" placeholder="เหตุผล / บันทึกปัญหาที่พบ / รายละเอียดเพิ่มเติม" data-s-note="${item.id}" value="${escapeHtml(item.note)}">
           </div>
-          <div class="small muted">${item.date?fmtDate(item.date):""}</div>
+          <div class="small muted" style="text-align:right;white-space:nowrap;">
+            <div data-s-date="${item.id}">${item.date?fmtDate(item.date):""}</div>
+            <button class="btn btn-primary btn-sm mt-8" data-s-save="${item.id}">บันทึก</button>
+          </div>
         </div>`).join("")}`;
   }).join("");
   return `
@@ -2651,6 +2654,7 @@ function renderSupervisorChecklistModal(emp){
     <div class="modal modal-wide">
       <div class="flex-between"><h3>${escapeHtml(emp.fullName)} — Onboarding Checklist</h3>
         <button class="btn btn-ghost btn-sm" id="s-chk-close">ปิด</button></div>
+      <div class="small muted mt-4">ติ๊ก/แก้ไขเหตุผลแล้วกด "บันทึก" ในแต่ละรายการเพื่อบันทึกทีละข้อ</div>
       ${blocks}
     </div>
   </div>`;
@@ -2658,31 +2662,45 @@ function renderSupervisorChecklistModal(emp){
 function bindSupervisorChecklistModal(emp, session){
   MODAL_OPEN = true;
   document.getElementById("s-chk-close").onclick = ()=>{ MODAL_OPEN = false; closeModal("s-chk-modal-overlay"); };
+
+  function findItem(id){
+    for(const k in emp.checklist){
+      const item = emp.checklist[k].find(i=>i.id===id);
+      if(item) return item;
+    }
+    return null;
+  }
+
   document.querySelectorAll("[data-s-chk]").forEach(el=>{
-    el.onclick = async ()=>{
-      for(const k in emp.checklist){
-        const item = emp.checklist[k].find(i=>i.id===el.dataset.sChk);
-        if(item){
-          item.done = !item.done; item.date = item.done?today():"";
-          closeModal("s-chk-modal-overlay");
-          openModal(renderSupervisorChecklistModal(emp)); bindSupervisorChecklistModal(emp, session);
-          try{ await persistEmployee(emp, `ติ๊ก Onboarding Checklist: ${item.label}${item.done?' (เสร็จแล้ว)':' (ยกเลิก)'}`); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
-          return;
-        }
-      }
+    el.onclick = ()=>{
+      const item = findItem(el.dataset.sChk);
+      if(!item) return;
+      item.done = !item.done;
+      item.date = item.done ? today() : "";
+      el.classList.toggle("done", item.done);
+      el.textContent = item.done ? "✓" : "";
+      const dateEl = document.querySelector(`[data-s-date="${item.id}"]`);
+      if(dateEl) dateEl.textContent = item.date ? fmtDate(item.date) : "";
     };
   });
   document.querySelectorAll("[data-s-note]").forEach(el=>{
-    el.addEventListener("change", async ()=>{
-      for(const k in emp.checklist){
-        const item = emp.checklist[k].find(i=>i.id===el.dataset.sNote);
-        if(item){
-          item.note = el.value;
-          try{ await persistEmployee(emp, `บันทึกหมายเหตุ Checklist: ${item.label}`); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
-          return;
-        }
-      }
+    el.addEventListener("input", ()=>{
+      const item = findItem(el.dataset.sNote);
+      if(item) item.note = el.value;
     });
+  });
+  document.querySelectorAll("[data-s-save]").forEach(el=>{
+    el.onclick = async ()=>{
+      const item = findItem(el.dataset.sSave);
+      if(!item) return;
+      const originalLabel = el.textContent;
+      el.disabled = true; el.textContent = "กำลังบันทึก...";
+      try{
+        await persistEmployee(emp, `อัปเดต Checklist: ${item.label}${item.done?' (เสร็จแล้ว)':' (ยังไม่เสร็จ)'}`);
+        toast("บันทึกแล้ว");
+      }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+      el.disabled = false; el.textContent = originalLabel;
+    };
   });
 }
 
