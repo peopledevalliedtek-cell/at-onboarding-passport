@@ -516,10 +516,40 @@ function examBadgesHtml(emp){
   return Object.values(QUIZ_ROUNDS).map(def=>{
     const res = getExamResult(emp, def.key);
     const short = def.key==="round1" ? "ปฐมนิเทศ" : "ก่อนผ่านทดลองงาน";
-    if(!res) return `<span class="pill pill-gray small">${short}: ยังไม่ทำ</span>`;
+    if(!res) return `<div class="small"><span class="pill pill-gray">${short}: ยังไม่ทำ</span></div>`;
     const pass = (res.auto/res.autoMax) >= def.passPct;
-    return `<span class="pill ${pass?'pill-green':'pill-amber'} small">${short}: ${res.auto}/${res.autoMax}${res.manualPending?` (รอตรวจ ${res.manualPending})`:""}</span>`;
-  }).join("<br>");
+    return `<div class="small mt-4">
+      <span class="pill ${pass?'pill-green':'pill-amber'}">${short}: ${res.auto}/${res.autoMax}${res.manualPending?` (รอตรวจ ${res.manualPending})`:""}</span>
+      <button class="btn btn-ghost btn-sm" style="padding:2px 8px;margin-left:4px;" data-review-exam-emp="${emp.id}" data-review-exam-round="${def.key}">ดูคำตอบ</button>
+    </div>`;
+  }).join("");
+}
+
+/** Read-only question-by-question breakdown: shows what the employee answered,
+    marks multiple-choice right/wrong, and shows the correct answer when wrong. */
+function renderExamReviewBlock(def, res){
+  const answers = (res && res.answers) || {};
+  return `
+  <div class="small muted mb-8">ผลรวม: ${res?`${res.auto} / ${res.autoMax}`:"-"} ${res && res.manualPending? ` · มีคำถามเขียนตอบรอ HR ตรวจ ${res.manualPending} ข้อ`:""}</div>
+  ${def.questions.map((q,qi)=>{
+    const given = answers[q.id];
+    if(q.type==="text"){
+      return `<div style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line);">
+        <div style="font-weight:700;margin-bottom:6px;">${qi+1}. ${escapeHtml(q.text)} ${q.ungraded?'<span class="pill pill-gray small">ไม่ให้คะแนน</span>':'<span class="pill pill-amber small">รอ HR ตรวจ</span>'}</div>
+        <div class="small" style="white-space:pre-wrap;background:#f7f7f8;padding:8px 10px;border-radius:6px;">${escapeHtml(given || "(ไม่ได้ตอบ)")}</div>
+      </div>`;
+    }
+    const isCorrect = given === q.correct;
+    return `<div style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line);">
+      <div style="font-weight:700;margin-bottom:6px;">${qi+1}. ${escapeHtml(q.text)} ${isCorrect?'<span class="pill pill-green small">✓ ถูก</span>':'<span class="pill pill-amber small">✗ ผิด</span>'}</div>
+      ${q.options.map((opt,oi)=>{
+        let style = "";
+        if(oi===q.correct) style = "color:var(--green);font-weight:600;";
+        else if(oi===given) style = "color:#b3261e;text-decoration:line-through;";
+        return `<div class="small" style="padding:3px 0;${style}">${oi===q.correct?'✓ ':(oi===given?'✗ ':'　 ')}${escapeHtml(opt)}</div>`;
+      }).join("")}
+    </div>`;
+  }).join("")}`;
 }
 
 function render(){
@@ -1240,7 +1270,10 @@ function renderEmployeeExam(emp){
                  <div class="small muted mt-8">ทำเมื่อ ${fmtDate(res.submittedAt)}${res.manualPending?` · รอ HR ตรวจคำตอบเขียน ${res.manualPending} ข้อ`:""}</div>`
               : `<span class="pill pill-gray">ยังไม่ได้ทำ</span>`}
           </div>
-          <button class="btn btn-secondary btn-sm mt-16" data-start-exam="${def.key}">${res? "ทำใหม่อีกครั้ง →" : "เริ่มทำข้อสอบ →"}</button>
+          <div class="flex gap-8 mt-16">
+            <button class="btn btn-secondary btn-sm" data-start-exam="${def.key}">${res? "ทำใหม่อีกครั้ง →" : "เริ่มทำข้อสอบ →"}</button>
+            ${res? `<button class="btn btn-ghost btn-sm" data-review-exam-emp="${emp.id}" data-review-exam-round="${def.key}">ดูเฉลยคำตอบ</button>` : ""}
+          </div>
         </div>`;
       }).join("")}
       <div class="card">
@@ -1349,6 +1382,26 @@ function bindAfterRoute(session){
   });
   document.querySelectorAll("[data-exam-text]").forEach(el=>{
     el.onchange = ()=>{ STATE.examDraft[el.dataset.examText] = el.value; };
+  });
+  // Answer review (HR / Supervisor: any employee; Employee: only their own — same UI)
+  document.querySelectorAll("[data-review-exam-emp]").forEach(el=>{
+    el.onclick = ()=>{
+      const emp = DB.employees.find(e=>e.id===el.dataset.reviewExamEmp);
+      const def = QUIZ_ROUNDS[el.dataset.reviewExamRound];
+      const res = getExamResult(emp, def.key);
+      openModal(`
+      <div class="modal-overlay" id="exam-review-overlay">
+        <div class="card" style="max-width:720px;width:100%;max-height:88vh;overflow:auto;margin:5vh auto;">
+          <div class="flex-between">
+            <h3>${escapeHtml(def.label)} — ${escapeHtml(emp.fullName||"")}</h3>
+            <button class="btn btn-ghost btn-sm" id="exam-review-close">ปิด</button>
+          </div>
+          <div class="mt-16">${renderExamReviewBlock(def, res)}</div>
+        </div>
+      </div>`);
+      document.getElementById("exam-review-close").onclick = ()=> closeModal("exam-review-overlay");
+      document.getElementById("exam-review-overlay").onclick = (e)=>{ if(e.target.id==="exam-review-overlay") closeModal("exam-review-overlay"); };
+    };
   });
   document.getElementById("exam-submit-btn")?.addEventListener("click", async ()=>{
     const def = QUIZ_ROUNDS[STATE.examActiveRound];
