@@ -934,6 +934,7 @@ function renderEmployeeManagement(){
           <td>${p}%</td>
           <td>${examBadgesHtml(e)}</td>
           <td class="flex gap-8">
+            <button class="btn btn-ghost btn-sm" data-open-checklist="${e.id}">Checklist</button>
             <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">แก้ไข</button>
             <button class="btn btn-danger btn-sm" data-del-emp="${e.id}">ลบ</button>
           </td>
@@ -1228,11 +1229,12 @@ function renderEmployeeJourney(emp){
   const title = phaseTitle(STATE.params.activePhase);
   return `
   <div class="card">
+    <div class="small muted mb-8">รายการนี้ให้พี่เลี้ยง/หัวหน้างาน หรือ HR เป็นผู้ติ๊กยืนยันให้ — ฝั่งของคุณดูความคืบหน้าได้อย่างเดียว</div>
     <div class="tabs">${tabHtml}</div>
     <h3 class="mt-16">${escapeHtml(title)}</h3>
     ${active.map(item=>`
       <div class="checklist-row">
-        <div class="chk-box ${item.done?'done':''}" data-chk="${item.id}">${item.done?'✓':''}</div>
+        <div class="chk-box ${item.done?'done':''}" style="cursor:default;">${item.done?'✓':''}</div>
         <div>
           <div>${escapeHtml(item.label)}</div>
           ${item.note?`<div class="small muted mt-8">หมายเหตุ: ${escapeHtml(item.note)}</div>`:""}
@@ -1370,6 +1372,8 @@ function closeModal(id){
 }
 
 function bindAfterRoute(session){
+  bindChecklistOpeners(session);
+
   // Orientation / pre-probation exam
   document.querySelectorAll("[data-start-exam]").forEach(el=>{
     el.onclick = ()=>{ STATE.examActiveRound = el.dataset.startExam; STATE.examDraft = {}; render(); };
@@ -1523,24 +1527,9 @@ function bindAfterRoute(session){
     };
   });
 
-  // Employee
+  // Employee: view-only journey tabs (ticking is done by mentor/supervisor/HR — see data-open-checklist)
   document.querySelectorAll("[data-phase-tab]").forEach(el=>{
     el.onclick = ()=>{ STATE.params.activePhase = el.dataset.phaseTab; renderRoute(session); };
-  });
-  document.querySelectorAll("[data-chk]").forEach(el=>{
-    el.onclick = async ()=>{
-      const emp = DB.employees.find(e=>e.id===session.employeeId);
-      for(const k in emp.checklist){
-        const item = emp.checklist[k].find(i=>i.id===el.dataset.chk);
-        if(item){
-          item.done = !item.done;
-          item.date = item.done ? today() : "";
-          renderRoute(session);
-          try{ await persistEmployee(emp); }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
-          return;
-        }
-      }
-    };
   });
   document.querySelectorAll("[data-fill-reflection]").forEach(el=>{
     el.onclick = ()=>{
