@@ -322,7 +322,7 @@ function seedDB(){
 }
 
 /* ---------------------- Store: Google Sheets backend via Apps Script ---------------------- */
-let DB = { org: seedDB().org, templates: [], employees: [], users: [], auditLog: [] };
+let DB = { org: seedDB().org, templates: [], employees: [], users: [], auditLog: [], redFlagCases: [] };
 let API_URL = localStorage.getItem(API_URL_KEY) || "";
 let API_CONNECTED = false;
 let POLL_TIMER = null;
@@ -358,6 +358,7 @@ async function refreshDB(){
   DB.employees = json.employees || [];
   DB.users = json.users && json.users.length ? json.users : seedDB().users;
   DB.auditLog = json.auditLog || [];
+  DB.redFlagCases = json.redFlagCases || [];
 }
 async function persistEmployee(emp, actionLabel){
   await apiCall("setEmployee", {id: emp.id, data: emp});
@@ -422,6 +423,15 @@ async function persistSettings(){
 async function persistUsers(){
   await apiCall("setUsers", {data: DB.users});
   logAudit("แก้ไขรหัสผ่าน / ผู้ใช้งานระบบ", "");
+}
+
+async function persistRedFlagCase(rf, actionLabel){
+  await apiCall("setRedFlagCase", {id: rf.id, data: rf});
+  logAudit(actionLabel || "บันทึกเคส Red Flag", rf.caseNo || rf.id);
+}
+async function persistDeleteRedFlagCase(id, caseNo){
+  await apiCall("deleteRedFlagCase", {id});
+  logAudit("ลบเคส Red Flag", caseNo || id);
 }
 
 /* ---------------------- Audit log ---------------------- */
@@ -759,6 +769,7 @@ function navItemsFor(role){
     {key:"templates", icon:"🧭", label:"Journey Template"},
     {key:"reports", icon:"📈", label:"Reports & Analytics"},
     {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"},
+    {key:"redflag", icon:"🚩", label:"Red Flag & Employee Support"},
     {key:"auditlog", icon:"🗂️", label:"Audit Logs"},
     {key:"settings", icon:"⚙️", label:"System Settings"}
   ];
@@ -772,7 +783,8 @@ function navItemsFor(role){
     {key:"journey", icon:"🧭", label:"My Journey"},
     {key:"exam", icon:"📝", label:"ข้อสอบปฐมนิเทศ"},
     {key:"reflection", icon:"💬", label:"Feedback / แบบสะท้อน"},
-    {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"}
+    {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"},
+    {key:"redflag", icon:"🚩", label:"Red Flag & แจ้งปัญหา"}
   ];
 }
 function roleLabel(role){
@@ -838,12 +850,17 @@ function renderRoute(session){
     employees:"Employee Management", templates:"Journey Template", reports:"Reports & Analytics",
     settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน",
     policies:"นโยบายและสวัสดิการพนักงาน", exam:"ข้อสอบปฐมนิเทศ / ก่อนผ่านทดลองงาน",
-    auditlog:"Audit Logs — ประวัติการใช้งานระบบ"
+    auditlog:"Audit Logs — ประวัติการใช้งานระบบ", redflag:"Red Flag & Employee Support"
   };
   document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
 
   if(STATE.route === "policies"){ content.innerHTML = renderPolicies(); bindAfterRoute(session); return; }
   if(STATE.route === "auditlog" && session.role==="hr"){ content.innerHTML = renderAuditLog(); bindAfterRoute(session); return; }
+  if(STATE.route === "redflag"){
+    content.innerHTML = session.role==="hr" ? renderHRRedFlag() : renderEmployeeRedFlag(session);
+    bindAfterRoute(session);
+    return;
+  }
 
   if(session.role === "hr"){
     if(STATE.route==="dashboard") content.innerHTML = renderHRDashboard();
@@ -886,11 +903,281 @@ const POLICY_DOCS = [
   {file:"13-redflag-harassment.jpg", title:"Red Flag — พฤติกรรมที่ไม่ควรเพิกเฉย (นโยบายห้ามบูลลี่และคุกคามทางเพศ)", group:"จรรยาบรรณ"}
 ];
 
+const REDFLAG_CHANNELS = [
+  "แจ้งผ่านระบบนี้ (ออนไลน์)", "แจ้ง HR โดยตรง", "แจ้งผ่านหัวหน้างาน / พี่เลี้ยง",
+  "กล่องรับเรื่องร้องเรียน", "โทรศัพท์ / สายด่วน", "อื่นๆ"
+];
+const REDFLAG_CATEGORIES = [
+  "การคุกคามทางเพศ (Sexual Harassment)", "การกลั่นแกล้ง / บูลลี่ (Bullying)",
+  "การเลือกปฏิบัติ / ไม่เป็นธรรม (Discrimination)", "ความไม่ปลอดภัยในการทำงาน (Safety)",
+  "การทุจริต / ประพฤติมิชอบ (Misconduct)", "อื่นๆ"
+];
+const REDFLAG_STATUSES = ["รอดำเนินการ", "กำลังตรวจสอบ", "รอข้อมูลเพิ่มเติม", "ปิดเคส"];
+
 const INTERNAL_CONTACTS = [
   {topic:"คอมพิวเตอร์ / โน้ตบุ๊ก / ระบบ IT", who:"คุณธนเศรษฐ์ (เก้ง) ผู้ดูแล IT", phone:"089-409-9784"},
   {topic:"เวลาทำงาน / ค่าจ้าง / Humansoft", who:"แผนกบุคคล คุณณัฐกาญจน์ (แนตตี้)", phone:"099-445-7085"},
   {topic:"เรื่องบัญชี", who:"แผนกบัญชี คุณพัชรี (ตู่)", phone:"081-170-9883"}
 ];
+/* =========================================================================
+   RED FLAG & EMPLOYEE SUPPORT — พัฒนาจากนโยบาย Red Flag (บูลลี่/คุกคามทางเพศ)
+   ให้พนักงานแจ้งปัญหาได้ (เลือกไม่ระบุตัวตนได้) และ HR ติดตาม/ปิดเคสในระบบ
+   ========================================================================= */
+function redflagStatusPill(status){
+  const map = { "รอดำเนินการ":"pill-gray", "กำลังตรวจสอบ":"pill-amber", "รอข้อมูลเพิ่มเติม":"pill-amber", "ปิดเคส":"pill-green" };
+  return `<span class="pill ${map[status]||'pill-gray'}">${escapeHtml(status||"-")}</span>`;
+}
+function nextRedFlagCaseNo(){
+  const year = new Date().getFullYear() + 543;
+  const countThisYear = (DB.redFlagCases||[]).filter(c=>(c.caseNo||"").includes(`RF-${year}-`)).length;
+  return `RF-${year}-${String(countThisYear+1).padStart(3,"0")}`;
+}
+
+/* ---------------------- Employee: submit + track own reports ---------------------- */
+function renderEmployeeRedFlag(session){
+  const emp = DB.employees.find(e=>e.id===session.employeeId);
+  const myCases = (DB.redFlagCases||[]).filter(c=>c.reporterId===session.employeeId).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  return `
+  <div class="card mb-16">
+    <div class="flex-between">
+      <div>
+        <b>Red Flag & Employee Support</b>
+        <div class="small muted mt-4">ช่องทางแจ้งปัญหาการบูลลี่ การคุกคามทางเพศ หรือพฤติกรรมที่ไม่เหมาะสมในที่ทำงาน — เลือกไม่เปิดเผยตัวตนได้</div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="rf-new-btn">🚩 แจ้งปัญหาใหม่</button>
+    </div>
+  </div>
+  <div class="section-title">เรื่องที่คุณเคยแจ้งไว้</div>
+  <div class="card">
+    ${myCases.length ? `
+    <table>
+      <thead><tr><th>เลขที่เคส</th><th>วันที่แจ้ง</th><th>ประเภท</th><th>สถานะ</th><th>อัปเดตล่าสุด</th></tr></thead>
+      <tbody>
+        ${myCases.map(c=>{
+          const lastFollow = (c.followUps||[])[c.followUps.length-1];
+          return `<tr>
+            <td>${escapeHtml(c.caseNo)}</td>
+            <td class="small">${fmtDateTime(c.createdAt)}</td>
+            <td>${escapeHtml(c.category)}</td>
+            <td>${redflagStatusPill(c.status)}</td>
+            <td class="small muted">${lastFollow ? escapeHtml(lastFollow.note) : (c.status==="ปิดเคส"?escapeHtml(c.closedNote||""):"-")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>` : `<div class="muted small">คุณยังไม่เคยแจ้งเรื่อง (เรื่องที่แจ้งแบบไม่ระบุตัวตนจะไม่แสดงในรายการนี้ เนื่องจากระบบไม่สามารถเชื่อมกลับมาที่คุณได้)</div>`}
+  </div>`;
+}
+
+function renderRedFlagFormModal(){
+  return `
+  <div class="modal-overlay" id="rf-form-overlay">
+    <div class="card modal-wide" style="max-width:640px;width:100%;max-height:90vh;overflow:auto;margin:5vh auto;">
+      <div class="flex-between"><h3>🚩 แจ้งปัญหา Red Flag</h3><button class="btn btn-ghost btn-sm" id="rf-form-close">ปิด</button></div>
+      <div class="card mt-16" style="background:#fdf1dc;">
+        <label class="flex" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="rf-anon" style="width:auto;">
+          <span class="small">ไม่ประสงค์ออกนาม (ไม่เปิดเผยตัวตน) — หากเลือกข้อนี้ คุณจะไม่สามารถติดตามสถานะเคสนี้ในระบบภายหลังได้</span>
+        </label>
+      </div>
+      <div class="grid grid-2 mt-16">
+        <div>
+          <label class="small muted">ช่องทางแจ้งปัญหา</label>
+          <select id="rf-channel">${REDFLAG_CHANNELS.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}</select>
+        </div>
+        <div>
+          <label class="small muted">ประเภทปัญหา</label>
+          <select id="rf-category">${REDFLAG_CATEGORIES.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <div class="grid grid-2 mt-16">
+        <div>
+          <label class="small muted">วันที่เกิดเหตุ</label>
+          <input type="date" id="rf-date" value="${today()}">
+        </div>
+        <div>
+          <label class="small muted">เวลาที่เกิดเหตุ (โดยประมาณ)</label>
+          <input type="time" id="rf-time" value="09:00">
+        </div>
+      </div>
+      <div class="mt-16">
+        <label class="small muted">ผู้เกี่ยวข้อง (ชื่อบุคคล/แผนก ถ้าทราบ)</label>
+        <input type="text" id="rf-involved" placeholder="เช่น นาย ก. แผนกผลิต, นาง ข. หัวหน้างาน">
+      </div>
+      <div class="mt-16">
+        <label class="small muted">รายละเอียดเหตุการณ์</label>
+        <textarea id="rf-details" rows="5" placeholder="อธิบายสิ่งที่เกิดขึ้นตามจริง ให้มากที่สุดเท่าที่ทำได้"></textarea>
+      </div>
+      <div class="flex gap-8 mt-16">
+        <button class="btn btn-primary" id="rf-submit-btn">ส่งเรื่อง</button>
+        <button class="btn btn-ghost" id="rf-cancel-btn">ยกเลิก</button>
+      </div>
+    </div>
+  </div>`;
+}
+function bindRedFlagFormModal(session){
+  MODAL_OPEN = true;
+  const close = ()=>{ MODAL_OPEN = false; closeModal("rf-form-overlay"); };
+  document.getElementById("rf-form-close").onclick = close;
+  document.getElementById("rf-cancel-btn").onclick = close;
+  document.getElementById("rf-submit-btn").onclick = async ()=>{
+    const details = document.getElementById("rf-details").value.trim();
+    if(!details){ toast("กรุณากรอกรายละเอียดเหตุการณ์"); return; }
+    const isAnonymous = document.getElementById("rf-anon").checked;
+    const emp = DB.employees.find(e=>e.id===session.employeeId);
+    const date = document.getElementById("rf-date").value || today();
+    const time = document.getElementById("rf-time").value || "09:00";
+    const rf = {
+      id: "rf_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      caseNo: nextRedFlagCaseNo(),
+      createdAt: new Date().toISOString(),
+      channel: document.getElementById("rf-channel").value,
+      category: document.getElementById("rf-category").value,
+      incidentDateTime: new Date(`${date}T${time}:00`).toISOString(),
+      details,
+      involvedPeople: document.getElementById("rf-involved").value.trim(),
+      isAnonymous,
+      reporterId: isAnonymous ? null : session.employeeId,
+      reporterName: isAnonymous ? "" : (emp ? emp.fullName : ""),
+      assignee: "", status: REDFLAG_STATUSES[0],
+      followUps: [], closedAt: "", closedNote: ""
+    };
+    const btn = document.getElementById("rf-submit-btn"); btn.disabled = true;
+    try{
+      await persistRedFlagCase(rf, `แจ้งปัญหา Red Flag ใหม่ (${rf.category})`);
+      DB.redFlagCases.push(rf);
+      close();
+      renderRoute(session);
+      toast(`ส่งเรื่องแล้ว — เลขที่เคส ${rf.caseNo}`);
+    }catch(e){ btn.disabled = false; toast("ส่งเรื่องไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+}
+
+/* ---------------------- HR: manage all cases ---------------------- */
+function renderHRRedFlag(){
+  const cases = [...(DB.redFlagCases||[])].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  const openCount = cases.filter(c=>c.status!=="ปิดเคส").length;
+  return `
+  <div class="card mb-16">
+    <b>Red Flag & Employee Support</b>
+    <div class="small muted mt-4">เคสที่ยังไม่ปิด ${openCount} จากทั้งหมด ${cases.length} เคส — พัฒนาจากนโยบาย Red Flag (บูลลี่/คุกคามทางเพศ) ในคู่มือพนักงาน</div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>เลขที่เคส</th><th>วันที่แจ้ง</th><th>ช่องทาง</th><th>ประเภท</th><th>ผู้แจ้ง</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th></th></tr></thead>
+      <tbody>
+        ${cases.length ? cases.map(c=>`<tr>
+          <td>${escapeHtml(c.caseNo)}</td>
+          <td class="small">${fmtDateTime(c.createdAt)}</td>
+          <td class="small">${escapeHtml(c.channel)}</td>
+          <td>${escapeHtml(c.category)}</td>
+          <td class="small">${c.isAnonymous ? '<span class="pill pill-gray small">ไม่ประสงค์ออกนาม</span>' : escapeHtml(c.reporterName||"-")}</td>
+          <td class="small">${escapeHtml(c.assignee||"-")}</td>
+          <td>${redflagStatusPill(c.status)}</td>
+          <td><button class="btn btn-ghost btn-sm" data-rf-manage="${c.id}">จัดการ</button></td>
+        </tr>`).join("") : `<tr><td colspan="8" class="muted">ยังไม่มีเคสที่แจ้งเข้ามา</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderRedFlagManageModal(rf){
+  const followHtml = (rf.followUps||[]).map(f=>`
+    <div class="card mb-8" style="background:#f7f8f9;">
+      <div class="small muted">${fmtDateTime(f.date)} · ${escapeHtml(f.by||"-")}</div>
+      <div class="mt-4">${escapeHtml(f.note)}</div>
+    </div>`).join("") || `<div class="muted small">ยังไม่มีการติดตามผล</div>`;
+  return `
+  <div class="modal-overlay" id="rf-manage-overlay">
+    <div class="card modal-wide" style="max-width:720px;width:100%;max-height:90vh;overflow:auto;margin:5vh auto;">
+      <div class="flex-between"><h3>${escapeHtml(rf.caseNo)}</h3><button class="btn btn-ghost btn-sm" id="rf-manage-close">ปิด</button></div>
+
+      <div class="card mt-16">
+        <div class="grid grid-2">
+          <div><div class="small muted">ช่องทางแจ้งปัญหา</div><div>${escapeHtml(rf.channel)}</div></div>
+          <div><div class="small muted">ประเภทปัญหา</div><div>${escapeHtml(rf.category)}</div></div>
+          <div><div class="small muted">วันเวลาที่เกิดเหตุ</div><div>${fmtDateTime(rf.incidentDateTime)}</div></div>
+          <div><div class="small muted">ผู้แจ้ง</div><div>${rf.isAnonymous?'ไม่ประสงค์ออกนาม':escapeHtml(rf.reporterName||"-")}</div></div>
+          <div style="grid-column:1/-1;"><div class="small muted">ผู้เกี่ยวข้อง</div><div>${escapeHtml(rf.involvedPeople||"-")}</div></div>
+          <div style="grid-column:1/-1;"><div class="small muted">รายละเอียดเหตุการณ์</div><div style="white-space:pre-wrap;">${escapeHtml(rf.details||"-")}</div></div>
+        </div>
+      </div>
+
+      <div class="grid grid-2 mt-16">
+        <div>
+          <label class="small muted">ผู้รับผิดชอบ</label>
+          <input type="text" id="rf-assignee" value="${escapeHtml(rf.assignee||"")}" placeholder="ชื่อผู้รับผิดชอบดำเนินการ">
+        </div>
+        <div>
+          <label class="small muted">สถานะการดำเนินการ</label>
+          <select id="rf-status">${REDFLAG_STATUSES.map(s=>`<option value="${s}" ${s===rf.status?"selected":""}>${s}</option>`).join("")}</select>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-sm mt-16" id="rf-save-meta-btn">บันทึกผู้รับผิดชอบ/สถานะ</button>
+
+      <div class="section-title">การติดตามผล</div>
+      <div class="card">
+        ${followHtml}
+        <div class="mt-16">
+          <textarea id="rf-follow-note" rows="2" placeholder="บันทึกความคืบหน้าการติดตามผล..."></textarea>
+          <button class="btn btn-ghost btn-sm mt-8" id="rf-add-follow-btn">+ เพิ่มการติดตามผล</button>
+        </div>
+      </div>
+
+      <div class="section-title">การปิดเคส</div>
+      <div class="card">
+        ${rf.status==="ปิดเคส" ? `
+          <div class="pill pill-green">ปิดเคสแล้วเมื่อ ${fmtDateTime(rf.closedAt)}</div>
+          <div class="mt-8" style="white-space:pre-wrap;">${escapeHtml(rf.closedNote||"")}</div>
+        ` : `
+          <textarea id="rf-close-note" rows="3" placeholder="สรุปผลการดำเนินการและข้อสรุปก่อนปิดเคส..."></textarea>
+          <button class="btn btn-primary btn-sm mt-8" id="rf-close-case-btn">ปิดเคสนี้</button>
+        `}
+      </div>
+    </div>
+  </div>`;
+}
+function bindRedFlagManageModal(rf, session){
+  MODAL_OPEN = true;
+  const close = ()=>{ MODAL_OPEN = false; closeModal("rf-manage-overlay"); };
+  document.getElementById("rf-manage-close").onclick = close;
+
+  document.getElementById("rf-save-meta-btn").onclick = async ()=>{
+    rf.assignee = document.getElementById("rf-assignee").value.trim();
+    rf.status = document.getElementById("rf-status").value;
+    try{
+      await persistRedFlagCase(rf, `อัปเดตเคส Red Flag: มอบหมาย/สถานะ`);
+      toast("บันทึกแล้ว");
+      close(); openModal(renderRedFlagManageModal(rf)); bindRedFlagManageModal(rf, session);
+      renderRoute(session);
+    }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+
+  document.getElementById("rf-add-follow-btn").onclick = async ()=>{
+    const note = document.getElementById("rf-follow-note").value.trim();
+    if(!note){ toast("กรุณากรอกบันทึกการติดตามผล"); return; }
+    const s = getSession();
+    rf.followUps = rf.followUps || [];
+    rf.followUps.push({ date: new Date().toISOString(), note, by: sessionActorLabel(s) });
+    try{
+      await persistRedFlagCase(rf, `เพิ่มการติดตามผลเคส Red Flag`);
+      close(); openModal(renderRedFlagManageModal(rf)); bindRedFlagManageModal(rf, session);
+      renderRoute(session);
+    }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+
+  document.getElementById("rf-close-case-btn")?.addEventListener("click", async ()=>{
+    const note = document.getElementById("rf-close-note").value.trim();
+    if(!note){ toast("กรุณาสรุปผลก่อนปิดเคส"); return; }
+    if(!confirm("ยืนยันปิดเคสนี้?")) return;
+    rf.status = "ปิดเคส"; rf.closedAt = new Date().toISOString(); rf.closedNote = note;
+    try{
+      await persistRedFlagCase(rf, `ปิดเคส Red Flag`);
+      close(); renderRoute(session);
+      toast("ปิดเคสแล้ว");
+    }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  });
+}
+
 /* =========================================================================
    AUDIT LOGS (HR only) — who did what, when, across the whole system
    ========================================================================= */
@@ -1506,6 +1793,17 @@ function bindExamReviewButtons(root){
 
 function bindAfterRoute(session){
   bindChecklistOpeners(session);
+
+  // Red Flag & Employee Support
+  document.getElementById("rf-new-btn")?.addEventListener("click", ()=>{
+    openModal(renderRedFlagFormModal()); bindRedFlagFormModal(session);
+  });
+  document.querySelectorAll("[data-rf-manage]").forEach(el=>{
+    el.onclick = ()=>{
+      const rf = DB.redFlagCases.find(c=>c.id===el.dataset.rfManage);
+      openModal(renderRedFlagManageModal(rf)); bindRedFlagManageModal(rf, session);
+    };
+  });
 
   // Orientation / pre-probation exam
   document.querySelectorAll("[data-start-exam]").forEach(el=>{

@@ -25,7 +25,8 @@ var SHEETS = {
   REFLECTION: 'แบบสะท้อน 2 ทาง',
   EXAM: 'ผลสอบปฐมนิเทศ',
   USERS: 'ผู้ใช้งานระบบ',
-  AUDIT: 'Audit Log'
+  AUDIT: 'Audit Log',
+  REDFLAG: 'Red Flag & Employee Support'
 };
 var AUDIT_LOG_MAX_ROWS_RETURNED = 500; // avoid an ever-growing payload on every page load
 
@@ -44,7 +45,8 @@ function doGet(e) {
         templates: readTemplates_(),
         employees: readEmployees_(),
         users: readUsers_(),
-        auditLog: readAuditLog_()
+        auditLog: readAuditLog_(),
+        redFlagCases: readRedFlagCases_()
       });
     }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
@@ -71,6 +73,8 @@ function doPost(e) {
       appendAuditLog_(body.actor, body.role, body.action, body.detail);
       return jsonResponse_({ ok: true });
     }
+    if (action === 'setRedFlagCase') { upsertRedFlagCase_(body.id, body.data); return jsonResponse_({ ok: true }); }
+    if (action === 'deleteRedFlagCase') { deleteRedFlagCase_(body.id); return jsonResponse_({ ok: true }); }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
   } catch (err) {
     return jsonResponse_({ ok: false, error: String(err) });
@@ -114,6 +118,11 @@ function setupSheets() {
   ]);
   ensureSheet_(ss, SHEETS.USERS, ['บทบาท', 'ชื่อผู้ใช้งาน', 'รหัสผ่าน']);
   ensureSheet_(ss, SHEETS.AUDIT, ['เวลา', 'ผู้ทำรายการ', 'บทบาท', 'การกระทำ', 'รายละเอียด']);
+  ensureSheet_(ss, SHEETS.REDFLAG, [
+    'เลขที่เคส', 'วันที่แจ้ง', 'ช่องทางแจ้งปัญหา', 'ประเภทปัญหา', 'วันเวลาที่เกิดเหตุ',
+    'ผู้แจ้ง', 'ผู้เกี่ยวข้อง', 'ผู้รับผิดชอบ', 'สถานะ', 'ปิดเคสเมื่อ',
+    'ข้อมูลเต็ม (JSON — ใช้งานในระบบ ไม่ต้องแก้ตรงนี้)'
+  ]);
 
   // seed default settings + users + one starter template if sheets are empty
   if (readSettings_().length === 0 || Object.keys(flattenSettings_(readSettings_())).length === 0) {
@@ -415,6 +424,42 @@ function deleteEmployee_(id) {
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.KPI), id);
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.REFLECTION), id);
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.EXAM), id);
+}
+
+/* ========================= red flag & employee support ========================= */
+
+function readRedFlagCases_() {
+  var sheet = sheetByName_(SHEETS.REDFLAG);
+  var values = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < values.length; i++) {
+    var json = values[i][10];
+    if (!json) continue;
+    try { out.push(JSON.parse(json)); } catch (e) { /* skip bad row */ }
+  }
+  return out;
+}
+
+function upsertRedFlagCase_(id, data) {
+  var sheet = sheetByName_(SHEETS.REDFLAG);
+  var row = findRowByFirstCol_(sheet, id);
+  var involved = Array.isArray(data.involvedPeople) ? data.involvedPeople.join(', ') : (data.involvedPeople || '');
+  var values = [
+    id,
+    data.createdAt ? Utilities.formatDate(new Date(data.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : '',
+    data.channel || '', data.category || '',
+    data.incidentDateTime ? Utilities.formatDate(new Date(data.incidentDateTime), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : '',
+    data.isAnonymous ? 'ไม่ประสงค์ออกนาม' : (data.reporterName || ''),
+    involved, data.assignee || '', data.status || '',
+    data.closedAt ? Utilities.formatDate(new Date(data.closedAt), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : '',
+    JSON.stringify(data)
+  ];
+  if (row === -1) sheet.appendRow(values);
+  else sheet.getRange(row, 1, 1, values.length).setValues([values]);
+}
+
+function deleteRedFlagCase_(id) {
+  deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.REDFLAG), id);
 }
 
 /* ---- profile photo upload (stored in Google Drive, linked onto the employee record) ---- */
