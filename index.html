@@ -592,16 +592,19 @@ function navItemsFor(role){
     {key:"employees", icon:"🧑‍💼", label:"Employee Management"},
     {key:"templates", icon:"🧭", label:"Journey Template"},
     {key:"reports", icon:"📈", label:"Reports & Analytics"},
+    {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"},
     {key:"settings", icon:"⚙️", label:"System Settings"}
   ];
   if(role === "supervisor") return [
     {key:"dashboard", icon:"📊", label:"Team Onboarding"},
-    {key:"approval", icon:"✅", label:"Approval / Reflections"}
+    {key:"approval", icon:"✅", label:"Approval / Reflections"},
+    {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"}
   ];
   return [
     {key:"dashboard", icon:"🛂", label:"My Passport"},
     {key:"journey", icon:"🧭", label:"My Journey"},
-    {key:"reflection", icon:"💬", label:"Feedback / แบบสะท้อน"}
+    {key:"reflection", icon:"💬", label:"Feedback / แบบสะท้อน"},
+    {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"}
   ];
 }
 function roleLabel(role){
@@ -665,9 +668,12 @@ function renderRoute(session){
   const titleMap = {
     dashboard: session.role==="hr" ? "HR Dashboard" : session.role==="supervisor" ? "Team Onboarding" : "My Passport",
     employees:"Employee Management", templates:"Journey Template", reports:"Reports & Analytics",
-    settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน"
+    settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน",
+    policies:"นโยบายและสวัสดิการพนักงาน"
   };
   document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
+
+  if(STATE.route === "policies"){ content.innerHTML = renderPolicies(); bindAfterRoute(session); return; }
 
   if(session.role === "hr"){
     if(STATE.route==="dashboard") content.innerHTML = renderHRDashboard();
@@ -688,6 +694,50 @@ function renderRoute(session){
     else if(STATE.route==="reflection") content.innerHTML = renderEmployeeReflection(emp);
     bindAfterRoute(session);
   }
+}
+
+/* =========================================================================
+   POLICIES & BENEFITS (shared across all roles)
+   ========================================================================= */
+const POLICY_DOCS = [
+  {file:"01-working-hours.jpg", title:"วันและเวลาทำงานปกติ เวลาพัก และวันหยุด", group:"เวลาทำงาน"},
+  {file:"09-shift-schedule.jpg", title:"ตารางบันทึกเวลาเข้า-ออกงาน (ตามกะ)", group:"เวลาทำงาน"},
+  {file:"03-time-attendance.jpg", title:"การสแกนใบหน้าบันทึกเวลา (App Human Soft)", group:"เวลาทำงาน"},
+  {file:"02-payroll.jpg", title:"รอบการจ่ายค่าจ้าง", group:"ค่าจ้างและเบี้ยเลี้ยง"},
+  {file:"10-perdiem-travel.jpg", title:"อัตราเบี้ยเลี้ยงและค่าที่พัก (ระเบียบ 01/2567)", group:"ค่าจ้างและเบี้ยเลี้ยง"},
+  {file:"04-vacation-leave.jpg", title:"การลาพักร้อน", group:"การลา"},
+  {file:"05-personal-leave.jpg", title:"การลากิจ", group:"การลา"},
+  {file:"06-sick-leave.jpg", title:"การลาป่วย", group:"การลา"},
+  {file:"08-employee-benefits.jpg", title:"สวัสดิการพนักงาน (19 รายการ)", group:"สวัสดิการ"},
+  {file:"07-probation-criteria.jpg", title:"เงื่อนไขและเกณฑ์ประเมินผลระยะทดลองงาน (119 วัน)", group:"ทดลองงาน"},
+  {file:"11-supplies-requisition.jpg", title:"วันและเวลาการเบิกอุปกรณ์ (สำนักงาน/แม่บ้าน/Safety)", group:"อุปกรณ์และความปลอดภัย"},
+  {file:"12-safety-asset-reliability.jpg", title:"การประเมินความเสี่ยงในพื้นที่แผนก Asset Reliability", group:"อุปกรณ์และความปลอดภัย"},
+  {file:"13-redflag-harassment.jpg", title:"Red Flag — พฤติกรรมที่ไม่ควรเพิกเฉย (นโยบายห้ามบูลลี่และคุกคามทางเพศ)", group:"จรรยาบรรณ"}
+];
+function renderPolicies(){
+  const groups = [];
+  POLICY_DOCS.forEach(d=>{ if(!groups.includes(d.group)) groups.push(d.group); });
+  return `
+  <div class="card mb-16">
+    <b>นโยบาย ระเบียบข้อบังคับ และสวัสดิการพนักงาน</b>
+    <div class="small muted mt-4">รวมเอกสารจากคู่มือพนักงานใหม่ — แตะที่ภาพเพื่อดูขนาดเต็ม</div>
+  </div>
+  ${groups.map(g=>`
+    <div class="section-title">${escapeHtml(g)}</div>
+    <div class="grid grid-2">
+      ${POLICY_DOCS.filter(d=>d.group===g).map(d=>`
+        <div class="card policy-card" data-policy-img="assets/policies/${d.file}" data-policy-title="${escapeHtml(d.title)}">
+          <img src="assets/policies/${d.file}" alt="${escapeHtml(d.title)}" style="width:100%;border-radius:8px;cursor:zoom-in;display:block;">
+          <div class="small" style="margin-top:8px;font-weight:600;">${escapeHtml(d.title)}</div>
+        </div>`).join("")}
+    </div>
+  `).join("")}
+  <div id="policy-lightbox" class="modal-overlay" style="display:none;align-items:center;justify-content:center;">
+    <div style="max-width:95vw;max-height:92vh;position:relative;" onclick="event.stopPropagation()">
+      <img id="policy-lightbox-img" src="" style="max-width:95vw;max-height:88vh;border-radius:8px;display:block;margin:0 auto;">
+      <div id="policy-lightbox-title" class="small" style="color:#fff;text-align:center;margin-top:10px;"></div>
+    </div>
+  </div>`;
 }
 
 /* =========================================================================
@@ -1129,6 +1179,17 @@ function closeModal(id){
 }
 
 function bindAfterRoute(session){
+  // Policies & Benefits lightbox
+  document.querySelectorAll("[data-policy-img]").forEach(el=>{
+    el.onclick = ()=>{
+      const lb = document.getElementById("policy-lightbox");
+      document.getElementById("policy-lightbox-img").src = el.dataset.policyImg;
+      document.getElementById("policy-lightbox-title").textContent = el.dataset.policyTitle;
+      lb.style.display = "flex";
+      lb.onclick = ()=>{ lb.style.display = "none"; };
+    };
+  });
+
   // HR: employees
   document.getElementById("add-emp-btn")?.addEventListener("click", ()=>{
     if(!DB.templates.length){ toast("กรุณาสร้าง Journey Template อย่างน้อย 1 รายการก่อน"); return; }
