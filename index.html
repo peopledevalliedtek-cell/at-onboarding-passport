@@ -885,6 +885,12 @@ const POLICY_DOCS = [
   {file:"12-safety-asset-reliability.jpg", title:"การประเมินความเสี่ยงในพื้นที่แผนก Asset Reliability", group:"อุปกรณ์และความปลอดภัย"},
   {file:"13-redflag-harassment.jpg", title:"Red Flag — พฤติกรรมที่ไม่ควรเพิกเฉย (นโยบายห้ามบูลลี่และคุกคามทางเพศ)", group:"จรรยาบรรณ"}
 ];
+
+const INTERNAL_CONTACTS = [
+  {topic:"คอมพิวเตอร์ / โน้ตบุ๊ก / ระบบ IT", who:"คุณธนเศรษฐ์ (เก้ง) ผู้ดูแล IT", phone:"089-409-9784"},
+  {topic:"เวลาทำงาน / ค่าจ้าง / Humansoft", who:"แผนกบุคคล คุณณัฐกาญจน์ (แนตตี้)", phone:"099-445-7085"},
+  {topic:"เรื่องบัญชี", who:"แผนกบัญชี คุณพัชรี (ตู่)", phone:"081-170-9883"}
+];
 /* =========================================================================
    AUDIT LOGS (HR only) — who did what, when, across the whole system
    ========================================================================= */
@@ -959,6 +965,20 @@ function renderPolicies(){
   <div class="card mt-16 policy-card" data-policy-img="assets/culture/17-our-clients.jpg" data-policy-title="OUR CLIENTS — ลูกค้าของเรา">
     <img src="assets/culture/17-our-clients.jpg" alt="Our Clients" style="width:100%;border-radius:8px;cursor:zoom-in;display:block;">
     <div class="small" style="margin-top:8px;font-weight:600;">OUR CLIENTS — ลูกค้าของเรา</div>
+  </div>
+
+  <div class="section-title">เรื่องอื่น ๆ ติดต่อใคร</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>เรื่อง</th><th>ติดต่อ</th><th>เบอร์โทร</th></tr></thead>
+      <tbody>
+        ${INTERNAL_CONTACTS.map(c=>`<tr>
+          <td>${escapeHtml(c.topic)}</td>
+          <td>${escapeHtml(c.who)}</td>
+          <td><a href="tel:${c.phone.replace(/-/g,"")}" style="color:var(--primary,#1a73e8);font-weight:600;text-decoration:none;">${escapeHtml(c.phone)}</a></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
   </div>
 
   ${groups.map(g=>`
