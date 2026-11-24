@@ -434,7 +434,8 @@ function newEmployeeFromTemplate(tpl){
     reflectionRounds: tpl.reflectionRounds,
     reflections:{},
     signatures:{employee:"",mentor:"",sectionMgr:"",deptMgr:"",hr:""},
-    status:"active"
+    status:"active",
+    exams:{}
   };
 }
 function employeeProgress(emp){
@@ -463,7 +464,63 @@ function employeeMilestone(emp){
 /* =========================================================================
    RENDER / ROUTER
    ========================================================================= */
-let STATE = { sidebarOpen:false, route:"dashboard", params:{} };
+let STATE = { sidebarOpen:false, route:"dashboard", params:{}, examActiveRound:null, examDraft:{} };
+
+/* ---------------------- Orientation & pre-probation exams ---------------------- */
+const QUIZ_ROUND1 = [
+  {id:"r1q1", text:"บริษัทของเราทำธุรกิจอะไรบ้าง?", options:["ออกแบบและสร้างโรงงานน้ำตาลและโรงงานยางแท่ง","ซ่อมชิ้นส่วนเครื่องจักร, ผลิตชิ้นส่วนเครื่องจักร","เทคโนโลยีงานเชื่อมโลหะ","โรงงานคัดแยกขยะ / พลังงานจากขยะและชีวมวล (Energy Tek)","ถูกทุกข้อ"], correct:4},
+  {id:"r1q2", text:"ลูกค้าของเราวัดว่าเราทำงานดีหรือไม่ดีจากอะไร?", options:["ราคาถูกที่สุด","ส่งทันวันที่รับปาก และงานถูกต้องตั้งแต่ครั้งแรก","จำนวนพนักงานของเรา","ความสวยงามของสำนักงาน"], correct:1},
+  {id:"r1q3", text:"ค่านิยมองค์กร (Core Value) 5 ข้อของเราคือข้อใด", options:["Professional, Grow, Green, Innovation, Better partner","Professional, Growth, Green, Innovation, Better partner","Professional, Growth, Green, Innovation, Service mind","Professional, Growth together, Green, Innovation, Better partner"], correct:1},
+  {id:"r1q4", text:"บริษัทใช้ระบบใดในการบันทึกเวลาทำงาน และต้องบันทึกวันละกี่ครั้ง?", options:["LINE — วันละ 2 ครั้ง","Humansoft (สแกนหน้าในแอป) — วันละ 4 ครั้ง: 08:00 · 12:00 · ก่อน 13:00 · 17:00","Google Forms — วันละ 1 ครั้ง","สมุดลงชื่อหน้าออฟฟิศ — เช้าและเย็น"], correct:1},
+  {id:"r1q5", text:"เช้าวันหนึ่งคุณมาถึงที่ทำงานแต่ลงเวลาไม่ได้ ต้องทำอย่างไรเป็นอันดับแรก", options:["กลับบ้าน เพราะลงเวลาไม่ได้","ให้เพื่อนลงเวลาแทน","แจ้ง HR/ผู้เกี่ยวข้องในวันนั้น และเก็บหลักฐานว่ามาทำงานจริง","รอสิ้นเดือนค่อยแจ้ง"], correct:2},
+  {id:"r1q6", text:"ถ้าพรุ่งนี้คุณป่วยกะทันหัน ต้องแจ้งใคร ทางไหน ก่อนกี่โมง?", options:["แจ้งเพื่อนร่วมงาน ทางไหนก็ได้ ไม่ต้องลงใบลา","แจ้งหัวหน้าโดยตรงก่อนเวลาเริ่มงาน และยื่นใบลาภายในวันนั้น","ไม่ต้องแจ้ง ถ้าลาแค่วันเดียว","แจ้ง HR อย่างเดียว"], correct:1},
+  {id:"r1q7", text:"ลากิจหรือลาพักร้อน ต้องขออนุมัติล่วงหน้าอย่างน้อยกี่วัน", options:["1","2","3","5"], correct:2},
+  {id:"r1q8", text:"ช่วงทดลองงาน ถ้าต้องหยุดงานด้วยธุระส่วนตัว ต้องเลือกประเภทการลาใด?", options:["ลากิจ (ได้รับค่าจ้าง)","ลากิจ (ไม่ได้รับค่าจ้าง)","ลาพักร้อน","ลาป่วย"], correct:1},
+  {id:"r1q9", text:"ลาป่วยติดต่อกันตั้งแต่กี่วันขึ้นไป ต้องแนบใบรับรองแพทย์", options:["1 วัน","2 วัน","3 วัน","5 วัน"], correct:2},
+  {id:"r1q10", text:"ไม่มาทำงานและไม่แจ้งเหตุติดต่อกันกี่วัน ถือว่าละทิ้งงานและผิดวินัยร้ายแรง", options:["2 วัน","3 วัน","5 วัน","7 วัน"], correct:1},
+  {id:"r1q11", text:"รอบการจ่ายค่าจ้างข้อใดถูกต้อง", options:["ช่าง (โรงงาน): รอบ 26–10 จ่ายวันที่ 16 และรอบ 11–25 จ่ายวันที่ 30/31","สำนักงาน: จ่ายเดือนละครั้ง รอบ 26–25 จ่ายวันที่ 30/31","ค่าล่วงเวลาและเบี้ยเลี้ยง ทำงวดนี้จ่ายงวดถัดไป","ถูกทุกข้อ"], correct:3},
+  {id:"r1q12", text:"เงินเดือนออกแล้วยอดไม่ตรง หรือสลิปผิด ต้องติดต่อใครเป็นอันดับแรก?", options:["แผนกบัญชี","แผนกบุคคล (HR)","หัวหน้าแผนก","แผนกจัดซื้อ"], correct:1},
+  {id:"r1q13", text:"เมื่อผ่านทดลองงานแล้ว จะได้รับสิทธิสวัสดิการใดเพิ่ม", options:["กองทุนสำรองเลี้ยงชีพ","กองทุนฌาปนกิจ","เครื่องแบบพนักงานและลาวันเกิด ตามเงื่อนไขที่บริษัทกำหนด","ถูกทุกข้อ"], correct:3},
+  {id:"r1q14", text:"ก่อนเข้าพื้นที่โรงงาน ต้องสวมอุปกรณ์ป้องกันอะไรบ้าง และเบิกได้ที่ไหน?", options:["รองเท้าเซฟตี้ แว่นนิรภัย หมวกในโซนที่กำหนด · เบิกที่งานความปลอดภัยตามวันเวลาที่กำหนด","รองเท้าผ้าใบ · เบิกที่ HR ได้ทุกวัน","ไม่ต้องสวม ถ้าเข้าแค่แป๊บเดียว","สวมเฉพาะหมวก · ซื้อเอง"], correct:0},
+  {id:"r1q15", text:"คุณเห็นสภาพการทำงานที่อาจเกิดอันตราย หรือเพื่อนไม่สวม PPE ควรทำอย่างไร?", options:["ปล่อยไว้ ไม่ใช่หน้าที่","ถ่ายรูปลง Social Media","เตือนอย่างเหมาะสม และแจ้งหัวหน้างาน/ผู้รับผิดชอบทันที","รอให้เกิดอุบัติเหตุก่อนค่อยแจ้ง"], correct:2},
+  {id:"r1q16", text:"พนักงานใหม่ได้รับการประเมินผลทดลองงานภายในระยะเวลาใด และบริษัทใช้ข้อมูลใดประกอบ?", options:["60 วัน · ใช้คะแนนสอบ","90 วัน · ใช้ความเห็นเพื่อนร่วมงาน","119 วัน · ใช้ Skill Map, Onboarding Checklist และสถิติ ลา/ขาด/สาย","180 วัน · ใช้ยอดขาย"], correct:2},
+];
+// Round 2 = ก่อนผ่านทดลองงาน (probation-pass). Mix of auto-graded MC and
+// open-text questions that HR reviews manually (type:"text").
+const QUIZ_ROUND2 = [
+  {id:"r2q1", text:"หน้าที่หลักของตำแหน่งคุณอยู่ในเอกสารใด และหาอ่านได้ที่ไหน?", options:["Smart JD · HR","สัญญาจ้าง · HR","ประกาศบริษัท · บอร์ด","ไม่มีเอกสาร ให้ถามเพื่อน"], correct:0},
+  {id:"r2q2", type:"text", text:"ให้ตอบจากสมุดพก: งานของคุณ \"วัดว่าดีหรือไม่ดี\" ด้วยตัววัดอะไร? (เขียนตอบอย่างน้อย 2 ตัววัด)"},
+  {id:"r2q3", text:"ใครเป็นคนเซ็นในแบบประเมินทุกครั้งที่สอนงาน และใครเซ็นรับรองผลประเมินแต่ละรอบ?", options:["HR เซ็นทั้งหมด","พี่เลี้ยงเซ็นเมื่อสอน · หัวหน้าโดยตรงเซ็นรับรองแต่ละรอบ","พนักงานใหม่เซ็นเอง","ผู้จัดการฝ่ายเซ็น"], correct:1},
+  {id:"r2q4", type:"text", ungraded:true, text:"ให้เล่าเรื่องจริง 1 เรื่องที่เห็นคนในแผนกทำ ที่ตรงกับ Core Value ข้อใดข้อหนึ่ง (เขียนตอบ 2–3 บรรทัด: วันที่ · ใครทำอะไร)"},
+  {id:"r2q5", type:"text", text:"ให้ตอบโดยไม่เปิดสมุด: พี่เลี้ยงของคุณชื่ออะไร? หัวหน้าโดยตรงชื่ออะไร? และ HR ที่ดูแลคุณชื่ออะไร?"},
+  {id:"r2q6", text:"ถ้ามีคนพูดจารุนแรง ล้อเลียนเรื่องส่วนตัว หรือคุณไม่ได้รับการสอนงานตามที่ตกลง (Red flag) คุณต้องทำอย่างไร?", options:["เก็บไว้ ไม่บอกใคร รอถึงวันครบทดลองงาน","บอก HR ทีม Onboarding ทันที (พูด โทร หรือ LINE)","โพสต์ลง Social Media","ลาออกทันที"], correct:1},
+];
+const QUIZ_ROUNDS = {
+  round1: {key:"round1", label:"ข้อสอบปฐมนิเทศ (วันปฐมนิเทศ)", questions: QUIZ_ROUND1, passPct: 0.8},
+  round2: {key:"round2", label:"ข้อสอบก่อนผ่านทดลองงาน", questions: QUIZ_ROUND2, passPct: 0.8},
+};
+function scoreQuizAnswers(def, answers){
+  let auto = 0, autoMax = 0, manualPending = 0;
+  def.questions.forEach(q=>{
+    if(q.ungraded) return;
+    if(q.type==="text"){ manualPending++; return; }
+    autoMax++;
+    if(answers[q.id]===q.correct) auto++;
+  });
+  return { auto, autoMax, manualPending };
+}
+function getExamResult(emp, roundKey){
+  return (emp.exams && emp.exams[roundKey]) || null;
+}
+function examBadgesHtml(emp){
+  return Object.values(QUIZ_ROUNDS).map(def=>{
+    const res = getExamResult(emp, def.key);
+    const short = def.key==="round1" ? "ปฐมนิเทศ" : "ก่อนผ่านทดลองงาน";
+    if(!res) return `<span class="pill pill-gray small">${short}: ยังไม่ทำ</span>`;
+    const pass = (res.auto/res.autoMax) >= def.passPct;
+    return `<span class="pill ${pass?'pill-green':'pill-amber'} small">${short}: ${res.auto}/${res.autoMax}${res.manualPending?` (รอตรวจ ${res.manualPending})`:""}</span>`;
+  }).join("<br>");
+}
 
 function render(){
   const root = document.getElementById("app");
@@ -603,6 +660,7 @@ function navItemsFor(role){
   return [
     {key:"dashboard", icon:"🛂", label:"My Passport"},
     {key:"journey", icon:"🧭", label:"My Journey"},
+    {key:"exam", icon:"📝", label:"ข้อสอบปฐมนิเทศ"},
     {key:"reflection", icon:"💬", label:"Feedback / แบบสะท้อน"},
     {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"}
   ];
@@ -669,7 +727,7 @@ function renderRoute(session){
     dashboard: session.role==="hr" ? "HR Dashboard" : session.role==="supervisor" ? "Team Onboarding" : "My Passport",
     employees:"Employee Management", templates:"Journey Template", reports:"Reports & Analytics",
     settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน",
-    policies:"นโยบายและสวัสดิการพนักงาน"
+    policies:"นโยบายและสวัสดิการพนักงาน", exam:"ข้อสอบปฐมนิเทศ / ก่อนผ่านทดลองงาน"
   };
   document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
 
@@ -691,6 +749,7 @@ function renderRoute(session){
     if(!emp){ content.innerHTML = `<div class="card">ไม่พบข้อมูลพนักงาน</div>`; return; }
     if(STATE.route==="dashboard") content.innerHTML = renderEmployeePassport(emp);
     else if(STATE.route==="journey") content.innerHTML = renderEmployeeJourney(emp);
+    else if(STATE.route==="exam") content.innerHTML = renderEmployeeExam(emp);
     else if(STATE.route==="reflection") content.innerHTML = renderEmployeeReflection(emp);
     bindAfterRoute(session);
   }
@@ -830,7 +889,7 @@ function renderEmployeeManagement(){
   </div>
   <div class="card mt-16">
     <table>
-      <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ตำแหน่ง / แผนก</th><th>Template</th><th>เริ่มงาน</th><th>ครบกำหนด</th><th>ความคืบหน้า</th><th></th></tr></thead>
+      <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ตำแหน่ง / แผนก</th><th>Template</th><th>เริ่มงาน</th><th>ครบกำหนด</th><th>ความคืบหน้า</th><th>ข้อสอบ</th><th></th></tr></thead>
       <tbody>
       ${emps.length ? emps.map(e=>{
         const tpl = DB.templates.find(t=>t.id===e.templateId);
@@ -843,12 +902,13 @@ function renderEmployeeManagement(){
           <td>${fmtDate(e.startDate)}</td>
           <td>${fmtDate(employeeEndDate(e))}<div class="small muted">${e.durationDays} วัน</div></td>
           <td>${p}%</td>
+          <td>${examBadgesHtml(e)}</td>
           <td class="flex gap-8">
             <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">แก้ไข</button>
             <button class="btn btn-danger btn-sm" data-del-emp="${e.id}">ลบ</button>
           </td>
         </tr>`;
-      }).join("") : `<tr><td colspan="8" class="muted">ยังไม่มีพนักงาน</td></tr>`}
+      }).join("") : `<tr><td colspan="9" class="muted">ยังไม่มีพนักงาน</td></tr>`}
       </tbody>
     </table>
   </div>`;
@@ -1048,6 +1108,7 @@ function renderTeamList(filterText){
       </div>
       <div class="progress-track mt-8"><div class="progress-fill" style="width:${p}%"></div></div>
       <div class="small muted mt-8">ความคืบหน้า ${p}% · วันที่ ${employeeDayNumber(e)}/${e.durationDays}</div>
+      <div class="mt-8">${examBadgesHtml(e)}</div>
       <button class="btn btn-ghost btn-sm mt-8" data-open-checklist="${e.id}">เปิด Onboarding Checklist</button>
     </div>`;
   }).join("");
@@ -1158,6 +1219,61 @@ function renderEmployeeJourney(emp){
   </div>`;
 }
 
+function renderEmployeeExam(emp){
+  if(!STATE.examActiveRound){
+    const due = emp.startDate ? addDays(emp.startDate, emp.durationDays||119) : null;
+    return `
+    <div class="card">
+      <div class="small muted">ทำข้อสอบปฐมนิเทศได้โดยตรงในนี้ — ติ๊กคำตอบแล้วกดส่ง ระบบคำนวณคะแนนให้ทันที (ยกเว้นคำถามแบบเขียนตอบที่ HR จะตรวจภายหลัง)</div>
+    </div>
+    <div class="section-title">สถานะการสอบ</div>
+    <div class="grid grid-2">
+      ${Object.values(QUIZ_ROUNDS).map(def=>{
+        const res = getExamResult(emp, def.key);
+        const pct = res ? res.auto/res.autoMax : null;
+        const pass = pct!=null ? pct>=def.passPct : null;
+        return `<div class="card">
+          <b>📝 ${escapeHtml(def.label)}</b>
+          <div class="mt-8">
+            ${res
+              ? `<span class="${pass?'pill pill-green':'pill pill-amber'}">${res.auto} / ${res.autoMax} — ${pass?'ผ่านเกณฑ์ 80%':'ยังไม่ผ่านเกณฑ์ 80%'}</span>
+                 <div class="small muted mt-8">ทำเมื่อ ${fmtDate(res.submittedAt)}${res.manualPending?` · รอ HR ตรวจคำตอบเขียน ${res.manualPending} ข้อ`:""}</div>`
+              : `<span class="pill pill-gray">ยังไม่ได้ทำ</span>`}
+          </div>
+          <button class="btn btn-secondary btn-sm mt-16" data-start-exam="${def.key}">${res? "ทำใหม่อีกครั้ง →" : "เริ่มทำข้อสอบ →"}</button>
+        </div>`;
+      }).join("")}
+      <div class="card">
+        <div class="small muted">วันครบกำหนดทดลองงาน</div>
+        <div class="mt-8" style="font-weight:700;">${due? fmtDate(due) : "-"}</div>
+      </div>
+    </div>`;
+  }
+  const def = QUIZ_ROUNDS[STATE.examActiveRound];
+  return `
+  <div class="card mb-16">
+    <b>${escapeHtml(def.label)}</b>
+    <div class="small muted mt-4">ข้อสอบมี ${def.questions.length} ข้อ ทุกข้อจำเป็นต้องตอบ — เกณฑ์ผ่าน ${Math.round(def.passPct*100)}%</div>
+  </div>
+  <div class="card">
+    ${def.questions.map((q,qi)=>`
+      <div style="margin-bottom:22px;padding-bottom:18px;${qi<def.questions.length-1?'border-bottom:1px solid var(--line);':''}">
+        <div style="font-weight:700;margin-bottom:10px;">${qi+1}. ${escapeHtml(q.text)}</div>
+        ${q.type==="text"
+          ? `<textarea rows="3" data-exam-text="${q.id}" style="width:100%;">${escapeHtml(STATE.examDraft[q.id]||"")}</textarea>`
+          : q.options.map((opt,oi)=>`
+            <label style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;">
+              <input type="radio" name="exam-${q.id}" data-exam-opt="${q.id}" value="${oi}" style="width:auto;padding:0;border:none;flex:none;" ${STATE.examDraft[q.id]===oi?'checked':''}>
+              <span>${escapeHtml(opt)}</span>
+            </label>`).join("")}
+      </div>`).join("")}
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-secondary" id="exam-cancel-btn">ยกเลิก</button>
+      <button class="btn btn-primary" id="exam-submit-btn">ส่งคำตอบ</button>
+    </div>
+  </div>`;
+}
+
 function renderEmployeeReflection(emp){
   return emp.reflectionRounds.map(r=>{
     const rec = emp.reflections[r.round] || {};
@@ -1221,6 +1337,42 @@ function closeModal(id){
 }
 
 function bindAfterRoute(session){
+  // Orientation / pre-probation exam
+  document.querySelectorAll("[data-start-exam]").forEach(el=>{
+    el.onclick = ()=>{ STATE.examActiveRound = el.dataset.startExam; STATE.examDraft = {}; render(); };
+  });
+  document.getElementById("exam-cancel-btn")?.addEventListener("click", ()=>{
+    STATE.examActiveRound = null; STATE.examDraft = {}; render();
+  });
+  document.querySelectorAll("[data-exam-opt]").forEach(el=>{
+    el.onchange = ()=>{ STATE.examDraft[el.dataset.examOpt] = Number(el.value); };
+  });
+  document.querySelectorAll("[data-exam-text]").forEach(el=>{
+    el.onchange = ()=>{ STATE.examDraft[el.dataset.examText] = el.value; };
+  });
+  document.getElementById("exam-submit-btn")?.addEventListener("click", async ()=>{
+    const def = QUIZ_ROUNDS[STATE.examActiveRound];
+    const unanswered = def.questions.filter(q=>{
+      const v = STATE.examDraft[q.id];
+      return v===undefined || v===null || v==="";
+    });
+    if(unanswered.length){ toast(`กรุณาตอบให้ครบทุกข้อ (เหลืออีก ${unanswered.length} ข้อ)`); return; }
+    const scored = scoreQuizAnswers(def, STATE.examDraft);
+    const emp = DB.employees.find(e=>e.id===session.employeeId);
+    emp.exams = emp.exams || {};
+    emp.exams[STATE.examActiveRound] = {
+      answers: {...STATE.examDraft},
+      auto: scored.auto, autoMax: scored.autoMax, manualPending: scored.manualPending,
+      submittedAt: new Date().toISOString()
+    };
+    try{
+      await persistEmployee(emp);
+      STATE.examActiveRound = null; STATE.examDraft = {};
+      renderRoute(session);
+      toast(`ส่งคำตอบแล้ว — ได้ ${scored.auto}/${scored.autoMax} คะแนน`);
+    }catch(e){ toast("ส่งคำตอบไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  });
+
   // Policies & Benefits lightbox
   document.querySelectorAll("[data-policy-img]").forEach(el=>{
     el.onclick = ()=>{
