@@ -26,7 +26,9 @@ var SHEETS = {
   EXAM: 'ผลสอบปฐมนิเทศ',
   USERS: 'ผู้ใช้งานระบบ',
   AUDIT: 'Audit Log',
-  REDFLAG: 'Red Flag & Employee Support'
+  REDFLAG: 'Red Flag & Employee Support',
+  SMARTJD: 'Smart Job Description',
+  JD_REGISTRY: 'ทะเบียนแผนก-ตำแหน่งงาน'
 };
 var AUDIT_LOG_MAX_ROWS_RETURNED = 500; // avoid an ever-growing payload on every page load
 
@@ -46,7 +48,9 @@ function doGet(e) {
         employees: readEmployees_(),
         users: readUsers_(),
         auditLog: readAuditLog_(),
-        redFlagCases: readRedFlagCases_()
+        redFlagCases: readRedFlagCases_(),
+        smartJDs: readSmartJDs_(),
+        positionRegistry: readPositionRegistry_()
       });
     }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
@@ -75,6 +79,13 @@ function doPost(e) {
     }
     if (action === 'setRedFlagCase') { upsertRedFlagCase_(body.id, body.data); return jsonResponse_({ ok: true }); }
     if (action === 'deleteRedFlagCase') { deleteRedFlagCase_(body.id); return jsonResponse_({ ok: true }); }
+    if (action === 'setSmartJD') { upsertSmartJD_(body.id, body.data); return jsonResponse_({ ok: true }); }
+    if (action === 'deleteSmartJD') { deleteSmartJD_(body.id); return jsonResponse_({ ok: true }); }
+    if (action === 'setPositionRegistry') { writePositionRegistry_(body.data); return jsonResponse_({ ok: true }); }
+    if (action === 'saveSmartJdPdf') {
+      var url = saveSmartJdPdfToDrive_(body.base64, body.filename, body.department, body.position, body.employeeName, body.monthLabel);
+      return jsonResponse_({ ok: true, url: url });
+    }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
   } catch (err) {
     return jsonResponse_({ ok: false, error: String(err) });
@@ -123,6 +134,12 @@ function setupSheets() {
     'ผู้แจ้ง', 'ผู้เกี่ยวข้อง', 'ผู้รับผิดชอบ', 'สถานะ', 'ปิดเคสเมื่อ',
     'ข้อมูลเต็ม (JSON — ใช้งานในระบบ ไม่ต้องแก้ตรงนี้)'
   ]);
+  ensureSheet_(ss, SHEETS.SMARTJD, [
+    'รหัสเอกสาร', 'แผนก', 'ส่วน', 'ฝ่าย', 'ตำแหน่งงาน', 'สถานะ',
+    'มอบหมายให้ (รหัสพนักงาน)', 'อัปเดตล่าสุด', 'ลิงก์ PDF ใน Drive',
+    'ข้อมูลเต็ม (JSON — ใช้งานในระบบ ไม่ต้องแก้ตรงนี้)'
+  ]);
+  ensureSheet_(ss, SHEETS.JD_REGISTRY, ['แผนก', 'ส่วน', 'ฝ่าย', 'ตำแหน่งงาน']);
 
   // seed default settings + users + one starter template if sheets are empty
   if (readSettings_().length === 0 || Object.keys(flattenSettings_(readSettings_())).length === 0) {
@@ -460,6 +477,75 @@ function upsertRedFlagCase_(id, data) {
 
 function deleteRedFlagCase_(id) {
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.REDFLAG), id);
+}
+
+/* ========================= smart job description ========================= */
+
+function readSmartJDs_() {
+  var sheet = sheetByName_(SHEETS.SMARTJD);
+  var values = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < values.length; i++) {
+    var json = values[i][9];
+    if (!json) continue;
+    try { out.push(JSON.parse(json)); } catch (e) { /* skip bad row */ }
+  }
+  return out;
+}
+
+function upsertSmartJD_(id, data) {
+  var sheet = sheetByName_(SHEETS.SMARTJD);
+  var row = findRowByFirstCol_(sheet, id);
+  var values = [
+    id, data.department || '', data.section || '', data.division || '', data.position || '',
+    data.status || '', data.assignedEmployeeId || '', new Date().toISOString(),
+    data.drivePdfUrl || '', JSON.stringify(data)
+  ];
+  if (row === -1) sheet.appendRow(values);
+  else sheet.getRange(row, 1, 1, values.length).setValues([values]);
+}
+
+function deleteSmartJD_(id) {
+  deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.SMARTJD), id);
+}
+
+function readPositionRegistry_() {
+  var sheet = sheetByName_(SHEETS.JD_REGISTRY);
+  var values = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < values.length; i++) {
+    if (!values[i][0] && !values[i][3]) continue;
+    out.push({ department: values[i][0], section: values[i][1], division: values[i][2], position: values[i][3] });
+  }
+  return out;
+}
+
+function writePositionRegistry_(list) {
+  var sheet = sheetByName_(SHEETS.JD_REGISTRY);
+  sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 4).clearContent();
+  var rows = (list || []).map(function (r) { return [r.department || '', r.section || '', r.division || '', r.position || '']; });
+  if (rows.length) sheet.getRange(2, 1, rows.length, 4).setValues(rows);
+}
+
+/** Saves a generated Smart JD PDF into the same Google Drive account as this
+    spreadsheet, organized as: Smart JD / <แผนก> / <เดือน> / <ชื่อพนักงานหรือตำแหน่ง> */
+function saveSmartJdPdfToDrive_(base64, filename, department, position, employeeName, monthLabel) {
+  var folder = getOrCreateFolderPath_(['Smart JD', department || 'ไม่ระบุแผนก', monthLabel || '-', employeeName || position || 'ไม่ระบุชื่อ']);
+  var bytes = Utilities.base64Decode(base64);
+  var blob = Utilities.newBlob(bytes, 'application/pdf', filename);
+  var file = folder.createFile(blob);
+  file.setName(filename);
+  return file.getUrl();
+}
+
+function getOrCreateFolderPath_(parts) {
+  var parent = DriveApp.getRootFolder();
+  parts.forEach(function (name) {
+    name = String(name || '-').substring(0, 120);
+    var it = parent.getFoldersByName(name);
+    parent = it.hasNext() ? it.next() : parent.createFolder(name);
+  });
+  return parent;
 }
 
 /* ---- profile photo upload (stored in Google Drive, linked onto the employee record) ---- */

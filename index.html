@@ -151,6 +151,8 @@ textarea{min-height:60px;resize:vertical;}
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/fontkit.umd.min.js"></script>
 <script>
 /* =========================================================================
    AT DIGITAL ONBOARDING PASSPORT
@@ -322,7 +324,7 @@ function seedDB(){
 }
 
 /* ---------------------- Store: Google Sheets backend via Apps Script ---------------------- */
-let DB = { org: seedDB().org, templates: [], employees: [], users: [], auditLog: [], redFlagCases: [] };
+let DB = { org: seedDB().org, templates: [], employees: [], users: [], auditLog: [], redFlagCases: [], smartJDs: [], positionRegistry: [] };
 let API_URL = localStorage.getItem(API_URL_KEY) || "";
 let API_CONNECTED = false;
 let POLL_TIMER = null;
@@ -359,6 +361,8 @@ async function refreshDB(){
   DB.users = json.users && json.users.length ? json.users : seedDB().users;
   DB.auditLog = json.auditLog || [];
   DB.redFlagCases = json.redFlagCases || [];
+  DB.smartJDs = json.smartJDs || [];
+  DB.positionRegistry = json.positionRegistry || [];
 }
 async function persistEmployee(emp, actionLabel){
   await apiCall("setEmployee", {id: emp.id, data: emp});
@@ -432,6 +436,19 @@ async function persistRedFlagCase(rf, actionLabel){
 async function persistDeleteRedFlagCase(id, caseNo){
   await apiCall("deleteRedFlagCase", {id});
   logAudit("ลบเคส Red Flag", caseNo || id);
+}
+
+async function persistSmartJD(jd, actionLabel){
+  await apiCall("setSmartJD", {id: jd.id, data: jd});
+  logAudit(actionLabel || "บันทึก Smart Job Description", `${jd.department||""} / ${jd.position||""}`);
+}
+async function persistDeleteSmartJD(id, label){
+  await apiCall("deleteSmartJD", {id});
+  logAudit("ลบ Smart Job Description", label || id);
+}
+async function persistPositionRegistry(){
+  await apiCall("setPositionRegistry", {data: DB.positionRegistry});
+  logAudit("อัปเดตทะเบียนแผนก/ตำแหน่งงาน", `${DB.positionRegistry.length} รายการ`);
 }
 
 /* ---------------------- Audit log ---------------------- */
@@ -770,6 +787,7 @@ function navItemsFor(role){
     {key:"reports", icon:"📈", label:"Reports & Analytics"},
     {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"},
     {key:"redflag", icon:"🚩", label:"Red Flag & Employee Support"},
+    {key:"smartjd", icon:"🗒️", label:"Smart Job Description"},
     {key:"auditlog", icon:"🗂️", label:"Audit Logs"},
     {key:"settings", icon:"⚙️", label:"System Settings"}
   ];
@@ -784,7 +802,8 @@ function navItemsFor(role){
     {key:"exam", icon:"📝", label:"ข้อสอบปฐมนิเทศ"},
     {key:"reflection", icon:"💬", label:"Feedback / แบบสะท้อน"},
     {key:"policies", icon:"📘", label:"นโยบายและสวัสดิการ"},
-    {key:"redflag", icon:"🚩", label:"Red Flag & แจ้งปัญหา"}
+    {key:"redflag", icon:"🚩", label:"Red Flag & แจ้งปัญหา"},
+    {key:"myjd", icon:"🗒️", label:"Job Description ของฉัน"}
   ];
 }
 function roleLabel(role){
@@ -850,7 +869,8 @@ function renderRoute(session){
     employees:"Employee Management", templates:"Journey Template", reports:"Reports & Analytics",
     settings:"System Settings", approval:"Approval / Reflections", journey:"My Journey", reflection:"Feedback / แบบสะท้อน",
     policies:"นโยบายและสวัสดิการพนักงาน", exam:"ข้อสอบปฐมนิเทศ / ก่อนผ่านทดลองงาน",
-    auditlog:"Audit Logs — ประวัติการใช้งานระบบ", redflag:"Red Flag & Employee Support"
+    auditlog:"Audit Logs — ประวัติการใช้งานระบบ", redflag:"Red Flag & Employee Support",
+    smartjd:"Smart Job Description", myjd:"Job Description ของฉัน"
   };
   document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
 
@@ -861,6 +881,8 @@ function renderRoute(session){
     bindAfterRoute(session);
     return;
   }
+  if(STATE.route === "smartjd" && session.role==="hr"){ content.innerHTML = renderHRSmartJD(); bindAfterRoute(session); return; }
+  if(STATE.route === "myjd"){ content.innerHTML = renderEmployeeMyJD(session); bindAfterRoute(session); return; }
 
   if(session.role === "hr"){
     if(STATE.route==="dashboard") content.innerHTML = renderHRDashboard();
@@ -1176,6 +1198,579 @@ function bindRedFlagManageModal(rf, session){
       toast("ปิดเคสแล้ว");
     }catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
   });
+}
+
+/* =========================================================================
+   SMART JOB DESCRIPTION (F-PM-25) — HR fills a form, generates a PDF that
+   matches the real Allied-Tek form (logo, fonts, document no.), saves it to
+   Google Drive (sorted by department / month / employee), and supports
+   online or uploaded-image signatures for all 5 signature slots.
+   ========================================================================= */
+const JD_SIG_SLOTS = [
+  {key:"employee", label:"พนักงาน ลงชื่อรับทราบ"},
+  {key:"deptManager", label:"ผู้จัดการแผนก (ผู้จัดทำ)"},
+  {key:"sectionManager", label:"ผู้จัดการส่วน"},
+  {key:"divisionManager", label:"ผู้จัดการฝ่าย (ผู้อนุมัติ)"},
+  {key:"hr", label:"แผนกบุคคล รับทราบ"}
+];
+function linesOf(text){ return String(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean); }
+function jdOrgLabel(jd){ return [jd.department,jd.section,jd.division].filter(Boolean).map(escapeHtml).join(" / ") || "-"; }
+function smartJdStatus(jd){
+  const signed = JD_SIG_SLOTS.filter(s=> jd.signatures && jd.signatures[s.key] && jd.signatures[s.key].signedAt);
+  if(signed.length===0) return "แบบร่าง";
+  if(signed.length===JD_SIG_SLOTS.length) return "เซ็นครบแล้ว";
+  return `ลงนามแล้ว ${signed.length}/${JD_SIG_SLOTS.length}`;
+}
+function smartJdStatusPill(jd){
+  const s = smartJdStatus(jd);
+  const cls = s==="เซ็นครบแล้ว" ? "pill-green" : s==="แบบร่าง" ? "pill-gray" : "pill-amber";
+  return `<span class="pill ${cls}">${s}</span>`;
+}
+function blankSmartJD(){
+  return {
+    id: "jd_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    docNo:"F-PM-25", revision:"04", effectiveDate:"02 Apr 2025",
+    department:"", section:"", division:"", position:"",
+    objectives:"", responsibilities:"", indicators:"",
+    qualAge:"", qualEducation:"", qualMajor:"", qualExperience:"", qualLicenses:"", qualOther:"",
+    authority:"", reportingLine:"",
+    knowledgeSkills:"", personality:"", usage:"",
+    assignedEmployeeId:"", createdAt: new Date().toISOString(),
+    signatures:{}, drivePdfUrl:""
+  };
+}
+
+/* ---------- PDF generation (pdf-lib), matching the real F-PM-25 form ---------- */
+async function fetchArrayBuffer(url){ const res = await fetch(url); return await res.arrayBuffer(); }
+function dataUrlToBytes(dataUrl){
+  const base64 = dataUrl.split(",")[1];
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function bytesToBase64(bytes){
+  let binary = ""; const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  return btoa(binary);
+}
+
+async function generateSmartJdPdfBytes(jd){
+  const { PDFDocument, rgb } = PDFLib;
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+  const [regularBytes, boldBytes, logoBytes] = await Promise.all([
+    fetchArrayBuffer("assets/fonts/Sarabun-Regular.ttf"),
+    fetchArrayBuffer("assets/fonts/Sarabun-Bold.ttf"),
+    fetchArrayBuffer("assets/smartjd/allied-tek-logo.png")
+  ]);
+  const font = await doc.embedFont(regularBytes, {subset:true});
+  const fontBold = await doc.embedFont(boldBytes, {subset:true});
+  const logoImg = await doc.embedPng(logoBytes);
+
+  const sigImages = {};
+  for(const slot of JD_SIG_SLOTS){
+    const sig = jd.signatures && jd.signatures[slot.key];
+    if(sig && sig.sigDataUrl){
+      try{
+        const bytes = dataUrlToBytes(sig.sigDataUrl);
+        sigImages[slot.key] = sig.sigDataUrl.indexOf("image/jpeg")>-1 ? await doc.embedJpg(bytes) : await doc.embedPng(bytes);
+      }catch(e){ /* ignore unreadable signature image */ }
+    }
+  }
+
+  const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 28;
+  const CONTENT_W = PAGE_W - MARGIN*2;
+  const RED = rgb(0.753,0.153,0.176), BLACK = rgb(0,0,0), WHITE = rgb(1,1,1);
+  const GRAY = rgb(0.45,0.45,0.45), LINE = rgb(0.75,0.75,0.75);
+
+  const pages = [];
+  let page, y;
+
+  function wrapText(fnt, size, maxWidth, text){
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const out = []; let cur = "";
+    const fits = t => fnt.widthOfTextAtSize(t, size) <= maxWidth;
+    for(const w of words){
+      const test = cur ? cur + " " + w : w;
+      if(fits(test)){ cur = test; continue; }
+      if(cur) out.push(cur);
+      if(fits(w)){ cur = w; continue; }
+      let chunk = "";
+      for(const ch of w){ const t2 = chunk+ch; if(fits(t2)) chunk = t2; else { out.push(chunk); chunk = ch; } }
+      cur = chunk;
+    }
+    if(cur) out.push(cur);
+    return out.length ? out : [""];
+  }
+
+  function drawHeader(isFirst){
+    if(isFirst){
+      const scale = 110/logoImg.width;
+      page.drawImage(logoImg, {x:MARGIN, y:y-logoImg.height*scale, width:logoImg.width*scale, height:logoImg.height*scale});
+      page.drawText("Document", {x:MARGIN+130, y:y-13, size:10, font:fontBold});
+      page.drawText(jd.docNo||"F-PM-25", {x:MARGIN+130, y:y-29, size:11, font, color:RED});
+      const titleX0 = MARGIN+250, titleX1 = PAGE_W-MARGIN-168;
+      const titleLines = wrapText(fontBold, 10.5, titleX1-titleX0, "รายละเอียดงาน (Smart Job Description)").slice(0,2);
+      const titleStartY = titleLines.length>1 ? y-16 : y-22;
+      titleLines.forEach((ln,i)=>{ page.drawText(ln, {x:titleX0, y:titleStartY-i*13, size:10.5, font:fontBold}); });
+      page.drawText("Revision:", {x:PAGE_W-MARGIN-160, y:y-13, size:9, font:fontBold});
+      page.drawText(String(jd.revision||"04"), {x:PAGE_W-MARGIN-85, y:y-13, size:9, font});
+      page.drawText("Effective Date:", {x:PAGE_W-MARGIN-160, y:y-29, size:9, font:fontBold});
+      page.drawText(jd.effectiveDate||"02 Apr 2025", {x:PAGE_W-MARGIN-85, y:y-29, size:9, font});
+      y -= 44;
+      page.drawLine({start:{x:MARGIN,y}, end:{x:PAGE_W-MARGIN,y}, thickness:1, color:BLACK});
+      y -= 18;
+      page.drawText(`แผนก : ${jd.department||""}`, {x:MARGIN, y, size:11, font});
+      page.drawText(`ส่วน : ${jd.section||""}`, {x:MARGIN+190, y, size:11, font});
+      page.drawText(`ฝ่าย : ${jd.division||""}`, {x:MARGIN+370, y, size:11, font});
+      y -= 20;
+      page.drawText(`ตำแหน่งงาน : ${jd.position||""}`, {x:MARGIN, y, size:12, font:fontBold});
+      y -= 18;
+    } else {
+      page.drawText(`${jd.docNo||"F-PM-25"} — Smart Job Description — ${jd.position||""}`, {x:MARGIN, y:y-9, size:8, font, color:GRAY});
+      y -= 20;
+    }
+  }
+  function newPage(isFirst){
+    page = doc.addPage([PAGE_W, PAGE_H]);
+    pages.push(page);
+    y = PAGE_H - MARGIN;
+    drawHeader(!!isFirst);
+  }
+  function ensureSpace(h){ if(y - h < MARGIN + 6) newPage(false); }
+
+  function drawSectionBar(label){
+    ensureSpace(20);
+    page.drawRectangle({x:MARGIN, y:y-16, width:CONTENT_W, height:16, color:BLACK});
+    page.drawText(label, {x:MARGIN+6, y:y-12, size:10, font:fontBold, color:WHITE});
+    y -= 20;
+  }
+  function drawRows(items){
+    const rows = items.length ? items : [""];
+    rows.forEach(line=>{
+      wrapText(font, 10.5, CONTENT_W-16, line).forEach(wl=>{
+        ensureSpace(15);
+        page.drawText(wl, {x:MARGIN+8, y:y-10, size:10.5, font});
+        page.drawLine({start:{x:MARGIN,y:y-13}, end:{x:MARGIN+CONTENT_W,y:y-13}, thickness:0.5, color:LINE});
+        y -= 15;
+      });
+    });
+  }
+  function drawListSection(label, items){ drawSectionBar(label); drawRows(items); y -= 5; }
+  function drawSubhead(label){ ensureSpace(15); page.drawText(label, {x:MARGIN+4, y:y-10, size:10.5, font:fontBold}); y -= 15; }
+  function drawKVRows(pairs){
+    pairs.forEach(([k,v])=>{
+      const wrapped = wrapText(font, 10.5, CONTENT_W-180, v||"");
+      wrapped.forEach((wl,i)=>{
+        ensureSpace(15);
+        if(i===0) page.drawText(k, {x:MARGIN+8, y:y-10, size:10.5, font:fontBold});
+        page.drawText(wl, {x:MARGIN+180, y:y-10, size:10.5, font});
+        page.drawLine({start:{x:MARGIN,y:y-13}, end:{x:MARGIN+CONTENT_W,y:y-13}, thickness:0.5, color:LINE});
+        y -= 15;
+      });
+    });
+    y -= 5;
+  }
+
+  newPage(true);
+  drawListSection("ส่วนที่ 1 : วัตถุประสงค์ที่บริษัทมีหน่วยงานและตำแหน่งงาน (Objectives)", linesOf(jd.objectives));
+  drawListSection("ส่วนที่ 2 : หน้าที่ความรับผิดชอบหลัก (Key responsibilities)", linesOf(jd.responsibilities));
+  drawListSection("ส่วนที่ 3 : ตัวชี้วัดผลงานตามหน้าที่ความรับผิดชอบ (Performance Indicators)", linesOf(jd.indicators));
+  drawSectionBar("ส่วนที่ 4 : คุณสมบัติผู้ดำรงตำแหน่ง (ต้องมีก่อนสมัครงาน)");
+  drawKVRows([
+    ["อายุตัว", jd.qualAge], ["วุฒิการศึกษา", jd.qualEducation], ["สาขา", jd.qualMajor],
+    ["ประสบการณ์ทำงาน", jd.qualExperience], ["ใบอนุญาตต่างๆ", jd.qualLicenses], ["อื่นๆ", jd.qualOther]
+  ]);
+  drawSectionBar("ส่วนที่ 5 : บทบาทผู้ดำรงตำแหน่ง");
+  drawKVRows([
+    ["5.1 อำนาจดำเนินการ", jd.authority || "ให้ดูรายละเอียดในคู่มือ / ระบบอำนาจดำเนินการ"],
+    ["5.2 สายบังคับบัญชา", jd.reportingLine || "ให้ดูรายละเอียดในผังองค์กร"]
+  ]);
+  drawSectionBar("ส่วนที่ 6 : ความรู้ ทักษะและคุณลักษณะที่จำเป็นต้องมี (Job Competencies)");
+  drawSubhead("6.1 ความรู้/ทักษะ (Knowledge & Skills/Functional competencies)");
+  drawRows(linesOf(jd.knowledgeSkills));
+  y -= 4;
+  drawSubhead("6.2 คุณลักษณะ (Personality/Attitude/Mental abilities)");
+  drawRows(linesOf(jd.personality));
+  y -= 5;
+  drawListSection("ส่วนที่ 7 : การนำ Job Description ไปใช้งาน", linesOf(jd.usage));
+
+  // signature block — always kept together on one block, pushed to a new page if it won't fit
+  ensureSpace(95);
+  const colW = CONTENT_W/JD_SIG_SLOTS.length;
+  const topY = y;
+  JD_SIG_SLOTS.forEach((slot,i)=>{
+    const x = MARGIN + i*colW;
+    const sig = (jd.signatures && jd.signatures[slot.key]) || {};
+    wrapText(fontBold, 7.5, colW-8, slot.label).forEach((wl,li)=>{
+      page.drawText(wl, {x:x+2, y:topY-9-li*9, size:7.5, font:fontBold});
+    });
+    if(sigImages[slot.key]){
+      const img = sigImages[slot.key];
+      const maxW = colW-10, maxH = 32;
+      const scale = Math.min(maxW/img.width, maxH/img.height, 1);
+      page.drawImage(img, {x:x+4, y:topY-55, width:img.width*scale, height:img.height*scale});
+    } else {
+      page.drawText("ลงชื่อ.........................", {x:x+2, y:topY-34, size:8, font});
+    }
+    page.drawText(`( ${sig.name||""} )`, {x:x+2, y:topY-62, size:8, font});
+    page.drawText(`ตำแหน่ง ${sig.position||""}`, {x:x+2, y:topY-74, size:8, font});
+    page.drawText(`วันที่ ${sig.date||""}`, {x:x+2, y:topY-86, size:8, font});
+  });
+  y = topY - 95;
+
+  const total = pages.length;
+  pages.forEach((p,i)=>{ p.drawText(`Page ${i+1} of ${total}`, {x:PAGE_W-MARGIN-80, y:16, size:8, font, color:GRAY}); });
+
+  return await doc.save();
+}
+
+async function generateAndSaveSmartJdPdf(jd, opts){
+  opts = opts || {};
+  const bytes = await generateSmartJdPdfBytes(jd);
+  const filename = `${jd.docNo||"F-PM-25"}_${(jd.position||"JD").replace(/[^\w฀-๿]+/g,"-")}_${jd.id}.pdf`;
+  if(API_URL){
+    const base64 = bytesToBase64(bytes);
+    const monthLabel = new Date().toLocaleDateString("th-TH-u-ca-buddhist", {year:"numeric", month:"long"});
+    const emp = jd.assignedEmployeeId ? DB.employees.find(e=>e.id===jd.assignedEmployeeId) : null;
+    const res = await apiCall("saveSmartJdPdf", {
+      base64, filename, department: jd.department, position: jd.position,
+      employeeName: emp ? emp.fullName : "", monthLabel
+    });
+    jd.drivePdfUrl = res.url;
+  }
+  if(opts.download !== false){
+    const blob = new Blob([bytes], {type:"application/pdf"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }
+  return jd.drivePdfUrl;
+}
+
+/* ---------- HR: list + create/edit form ---------- */
+function jdDatalistsHtml(){
+  const uniq = arr => [...new Set(arr.filter(Boolean))];
+  const depts = uniq(DB.positionRegistry.map(r=>r.department));
+  const sections = uniq(DB.positionRegistry.map(r=>r.section));
+  const divisions = uniq(DB.positionRegistry.map(r=>r.division));
+  const positions = uniq(DB.positionRegistry.map(r=>r.position));
+  const opt = arr => arr.map(v=>`<option value="${escapeHtml(v)}">`).join("");
+  return `
+    <datalist id="jd-dept-list">${opt(depts)}</datalist>
+    <datalist id="jd-section-list">${opt(sections)}</datalist>
+    <datalist id="jd-division-list">${opt(divisions)}</datalist>
+    <datalist id="jd-position-list">${opt(positions)}</datalist>`;
+}
+function renderHRSmartJD(){
+  const docs = [...(DB.smartJDs||[])].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  return `
+  <div class="card mb-16">
+    <div class="flex-between">
+      <div>
+        <b>Smart Job Description (F-PM-25)</b>
+        <div class="small muted mt-4">สร้าง JD จากแบบฟอร์มต้นฉบับ สร้าง PDF พร้อมโลโก้/ฟอนต์/เลขเอกสารเหมือนต้นฉบับ เก็บลง Google Drive อัตโนมัติ</div>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-ghost btn-sm" id="jd-registry-btn">จัดการทะเบียนแผนก/ตำแหน่ง</button>
+        <button class="btn btn-primary btn-sm" id="jd-new-btn">+ สร้าง JD ใหม่</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>แผนก / ส่วน / ฝ่าย</th><th>ตำแหน่งงาน</th><th>มอบหมายให้</th><th>สถานะ</th><th>อัปเดตล่าสุด</th><th></th></tr></thead>
+      <tbody>
+        ${docs.length ? docs.map(jd=>{
+          const emp = jd.assignedEmployeeId ? DB.employees.find(e=>e.id===jd.assignedEmployeeId) : null;
+          return `<tr>
+            <td class="small">${jdOrgLabel(jd)}</td>
+            <td>${escapeHtml(jd.position)}</td>
+            <td class="small">${emp?escapeHtml(emp.fullName):'<span class="muted">ยังไม่มอบหมาย</span>'}</td>
+            <td>${smartJdStatusPill(jd)}</td>
+            <td class="small">${fmtDateTime(jd.createdAt)}</td>
+            <td><button class="btn btn-ghost btn-sm" data-jd-manage="${jd.id}">จัดการ</button></td>
+          </tr>`;
+        }).join("") : `<tr><td colspan="6" class="muted">ยังไม่มี Smart JD ที่สร้างไว้</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  ${jdDatalistsHtml()}`;
+}
+
+function renderSmartJdFormModal(jd){
+  return `
+  <div class="modal-overlay" id="jd-form-overlay">
+    <div class="card modal-wide" style="max-width:760px;width:100%;max-height:92vh;overflow:auto;margin:4vh auto;">
+      <div class="flex-between"><h3>🗒️ ${jd._isNew?'สร้าง Smart JD ใหม่':'แก้ไข Smart JD'}</h3><button class="btn btn-ghost btn-sm" id="jd-form-close">ปิด</button></div>
+
+      <div class="grid grid-2 mt-16">
+        <div><label class="small muted">แผนก</label><input id="jd-department" list="jd-dept-list" value="${escapeHtml(jd.department)}"></div>
+        <div><label class="small muted">ส่วน</label><input id="jd-section" list="jd-section-list" value="${escapeHtml(jd.section)}"></div>
+        <div><label class="small muted">ฝ่าย</label><input id="jd-division" list="jd-division-list" value="${escapeHtml(jd.division)}"></div>
+        <div><label class="small muted">ตำแหน่งงาน</label><input id="jd-position" list="jd-position-list" value="${escapeHtml(jd.position)}"></div>
+      </div>
+      <div class="mt-16">
+        <label class="small muted">มอบหมายให้พนักงาน (ไม่บังคับ — เพื่อให้พนักงานเห็นและเซ็นในระบบได้)</label>
+        <select id="jd-assignee">
+          <option value="">— ไม่ระบุ —</option>
+          ${DB.employees.map(e=>`<option value="${e.id}" ${e.id===jd.assignedEmployeeId?"selected":""}>${escapeHtml(e.fullName)} (${escapeHtml(e.position||"")})</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="section-title">ส่วนที่ 1 : วัตถุประสงค์ที่บริษัทมีหน่วยงานและตำแหน่งงาน</div>
+      <textarea id="jd-objectives" rows="3" placeholder="1 บรรทัด = 1 ข้อ">${escapeHtml(jd.objectives)}</textarea>
+
+      <div class="section-title">ส่วนที่ 2 : หน้าที่ความรับผิดชอบหลัก</div>
+      <textarea id="jd-responsibilities" rows="4" placeholder="1 บรรทัด = 1 ข้อ">${escapeHtml(jd.responsibilities)}</textarea>
+
+      <div class="section-title">ส่วนที่ 3 : ตัวชี้วัดผลงานตามหน้าที่ความรับผิดชอบ</div>
+      <textarea id="jd-indicators" rows="4" placeholder="1 บรรทัด = 1 ข้อ">${escapeHtml(jd.indicators)}</textarea>
+
+      <div class="section-title">ส่วนที่ 4 : คุณสมบัติผู้ดำรงตำแหน่ง</div>
+      <div class="grid grid-2">
+        <div><label class="small muted">อายุตัว</label><input id="jd-qualAge" value="${escapeHtml(jd.qualAge)}"></div>
+        <div><label class="small muted">วุฒิการศึกษา</label><input id="jd-qualEducation" value="${escapeHtml(jd.qualEducation)}"></div>
+        <div><label class="small muted">สาขา</label><input id="jd-qualMajor" value="${escapeHtml(jd.qualMajor)}"></div>
+        <div><label class="small muted">ประสบการณ์ทำงาน</label><input id="jd-qualExperience" value="${escapeHtml(jd.qualExperience)}"></div>
+        <div><label class="small muted">ใบอนุญาตต่างๆ</label><input id="jd-qualLicenses" value="${escapeHtml(jd.qualLicenses)}"></div>
+        <div><label class="small muted">อื่นๆ</label><input id="jd-qualOther" value="${escapeHtml(jd.qualOther)}"></div>
+      </div>
+
+      <div class="section-title">ส่วนที่ 5 : บทบาทผู้ดำรงตำแหน่ง</div>
+      <label class="small muted">5.1 อำนาจดำเนินการ</label>
+      <textarea id="jd-authority" rows="2" placeholder="ให้ดูรายละเอียดในคู่มือ / ระบบอำนาจดำเนินการ">${escapeHtml(jd.authority)}</textarea>
+      <label class="small muted mt-8">5.2 สายบังคับบัญชา</label>
+      <textarea id="jd-reportingLine" rows="2" placeholder="ให้ดูรายละเอียดในผังองค์กร">${escapeHtml(jd.reportingLine)}</textarea>
+
+      <div class="section-title">ส่วนที่ 6 : ความรู้ ทักษะและคุณลักษณะที่จำเป็นต้องมี</div>
+      <label class="small muted">6.1 ความรู้/ทักษะ</label>
+      <textarea id="jd-knowledgeSkills" rows="3" placeholder="1 บรรทัด = 1 ข้อ">${escapeHtml(jd.knowledgeSkills)}</textarea>
+      <label class="small muted mt-8">6.2 คุณลักษณะ</label>
+      <textarea id="jd-personality" rows="3" placeholder="1 บรรทัด = 1 ข้อ">${escapeHtml(jd.personality)}</textarea>
+
+      <div class="section-title">ส่วนที่ 7 : การนำ Job Description ไปใช้งาน</div>
+      <textarea id="jd-usage" rows="3" placeholder="1 บรรทัด = 1 ข้อ">${escapeHtml(jd.usage)}</textarea>
+
+      <div class="flex gap-8 mt-16">
+        <button class="btn btn-primary" id="jd-save-btn">บันทึก และสร้าง PDF</button>
+        <button class="btn btn-ghost" id="jd-cancel-btn">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+  ${jdDatalistsHtml()}`;
+}
+function bindSmartJdFormModal(jd, session){
+  MODAL_OPEN = true;
+  const close = ()=>{ MODAL_OPEN = false; closeModal("jd-form-overlay"); };
+  document.getElementById("jd-form-close").onclick = close;
+  document.getElementById("jd-cancel-btn").onclick = close;
+  document.getElementById("jd-save-btn").onclick = async ()=>{
+    const v = id => document.getElementById(id).value.trim();
+    jd.department = v("jd-department"); jd.section = v("jd-section"); jd.division = v("jd-division"); jd.position = v("jd-position");
+    jd.assignedEmployeeId = document.getElementById("jd-assignee").value;
+    jd.objectives = v("jd-objectives"); jd.responsibilities = v("jd-responsibilities"); jd.indicators = v("jd-indicators");
+    jd.qualAge = v("jd-qualAge"); jd.qualEducation = v("jd-qualEducation"); jd.qualMajor = v("jd-qualMajor");
+    jd.qualExperience = v("jd-qualExperience"); jd.qualLicenses = v("jd-qualLicenses"); jd.qualOther = v("jd-qualOther");
+    jd.authority = v("jd-authority"); jd.reportingLine = v("jd-reportingLine");
+    jd.knowledgeSkills = v("jd-knowledgeSkills"); jd.personality = v("jd-personality"); jd.usage = v("jd-usage");
+    if(!jd.position){ toast("กรุณากรอกตำแหน่งงาน"); return; }
+    const btn = document.getElementById("jd-save-btn"); btn.disabled = true; btn.textContent = "กำลังสร้าง PDF...";
+    try{
+      // learn this department/section/division/position combo for future autocomplete
+      const known = DB.positionRegistry.some(r=> r.department===jd.department && r.position===jd.position);
+      if(!known && jd.department && jd.position){
+        DB.positionRegistry.push({department:jd.department, section:jd.section, division:jd.division, position:jd.position});
+        persistPositionRegistry().catch(()=>{});
+      }
+      await generateAndSaveSmartJdPdf(jd);
+      const isNew = !!jd._isNew; delete jd._isNew;
+      await persistSmartJD(jd, isNew ? "สร้าง Smart JD ใหม่" : "แก้ไข Smart JD");
+      if(isNew) DB.smartJDs.push(jd);
+      close(); renderRoute(session);
+      toast("สร้าง PDF และบันทึกแล้ว");
+    }catch(e){ btn.disabled = false; btn.textContent = "บันทึก และสร้าง PDF"; toast("บันทึกไม่สำเร็จ: " + (e.message||"ตรวจสอบการเชื่อมต่อ")); }
+  };
+}
+
+function renderPositionRegistryModal(){
+  const csv = DB.positionRegistry.map(r=>[r.department,r.section,r.division,r.position].join(",")).join("\n");
+  return `
+  <div class="modal-overlay" id="jd-registry-overlay">
+    <div class="card" style="max-width:600px;width:100%;max-height:88vh;overflow:auto;margin:6vh auto;">
+      <div class="flex-between"><h3>ทะเบียนแผนก / ส่วน / ฝ่าย / ตำแหน่งงาน</h3><button class="btn btn-ghost btn-sm" id="jd-registry-close">ปิด</button></div>
+      <div class="small muted mt-8">1 บรรทัด = 1 ตำแหน่ง รูปแบบ: แผนก,ส่วน,ฝ่าย,ตำแหน่งงาน — ใช้สำหรับ autocomplete ตอนสร้าง JD (วางจากไฟล์ทะเบียนพนักงาน/Excel ได้โดยคัดลอกเป็น CSV)</div>
+      <textarea id="jd-registry-csv" rows="14" class="mt-8" style="font-family:monospace;">${escapeHtml(csv)}</textarea>
+      <button class="btn btn-primary btn-sm mt-8" id="jd-registry-save-btn">บันทึกทะเบียน</button>
+    </div>
+  </div>`;
+}
+function bindPositionRegistryModal(session){
+  MODAL_OPEN = true;
+  const close = ()=>{ MODAL_OPEN = false; closeModal("jd-registry-overlay"); };
+  document.getElementById("jd-registry-close").onclick = close;
+  document.getElementById("jd-registry-save-btn").onclick = async ()=>{
+    const text = document.getElementById("jd-registry-csv").value;
+    DB.positionRegistry = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{
+      const [department="",section="",division="",position=""] = l.split(",").map(s=>s.trim());
+      return {department,section,division,position};
+    });
+    try{ await persistPositionRegistry(); close(); toast("บันทึกทะเบียนแล้ว"); }
+    catch(e){ toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+}
+
+/* ---------- manage modal: assignment + signatures ---------- */
+function renderSmartJdManageModal(jd){
+  const emp = jd.assignedEmployeeId ? DB.employees.find(e=>e.id===jd.assignedEmployeeId) : null;
+  return `
+  <div class="modal-overlay" id="jd-manage-overlay">
+    <div class="card modal-wide" style="max-width:680px;width:100%;max-height:90vh;overflow:auto;margin:5vh auto;">
+      <div class="flex-between"><h3>${escapeHtml(jd.position)}</h3><button class="btn btn-ghost btn-sm" id="jd-manage-close">ปิด</button></div>
+      <div class="small muted mt-4">${jdOrgLabel(jd)} — ${smartJdStatusPill(jd)}</div>
+      <div class="small mt-8">มอบหมายให้: ${emp?escapeHtml(emp.fullName):'<span class="muted">ยังไม่มอบหมาย</span>'}</div>
+      ${jd.drivePdfUrl ? `<div class="mt-8"><a href="${escapeHtml(jd.drivePdfUrl)}" target="_blank" class="btn btn-ghost btn-sm">📄 เปิดไฟล์ PDF ใน Google Drive</a></div>` : `<div class="small muted mt-8">ยังไม่มีไฟล์ PDF ใน Drive (บันทึกครั้งแรกจะสร้างให้อัตโนมัติ)</div>`}
+
+      <div class="flex gap-8 mt-16">
+        <button class="btn btn-secondary btn-sm" id="jd-edit-content-btn">แก้ไขเนื้อหา</button>
+        <button class="btn btn-ghost btn-sm" id="jd-regenerate-btn">สร้าง PDF ใหม่ (ดาวน์โหลด)</button>
+      </div>
+
+      <div class="section-title">ลายเซ็น</div>
+      ${JD_SIG_SLOTS.map(slot=>{
+        const sig = (jd.signatures && jd.signatures[slot.key]) || {};
+        return `<div class="card mb-8 flex-between">
+          <div>
+            <b>${slot.label}</b>
+            ${sig.signedAt ? `<div class="small muted mt-4">เซ็นโดย ${escapeHtml(sig.name||"")} · ${fmtDateTime(sig.signedAt)}</div>` : `<div class="small muted mt-4">ยังไม่ได้เซ็น</div>`}
+          </div>
+          ${sig.sigDataUrl?`<img src="${sig.sigDataUrl}" style="height:36px;border:1px solid var(--line);border-radius:4px;background:#fff;">`:""}
+          <button class="btn btn-ghost btn-sm" data-jd-sign="${slot.key}">${sig.signedAt?"เซ็นใหม่":"เซ็น"}</button>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+function bindSmartJdManageModal(jd, session){
+  MODAL_OPEN = true;
+  const close = ()=>{ MODAL_OPEN = false; closeModal("jd-manage-overlay"); };
+  document.getElementById("jd-manage-close").onclick = close;
+  document.getElementById("jd-edit-content-btn").onclick = ()=>{
+    close(); openModal(renderSmartJdFormModal(jd)); bindSmartJdFormModal(jd, session);
+  };
+  document.getElementById("jd-regenerate-btn").onclick = async ()=>{
+    try{ await generateAndSaveSmartJdPdf(jd); await persistSmartJD(jd, "สร้าง PDF ใหม่"); toast("สร้าง PDF ใหม่แล้ว"); }
+    catch(e){ toast("สร้าง PDF ไม่สำเร็จ"); }
+  };
+  document.querySelectorAll("[data-jd-sign]").forEach(el=>{
+    el.onclick = ()=>{
+      const slot = JD_SIG_SLOTS.find(s=>s.key===el.dataset.jdSign);
+      close();
+      openModal(renderSignaturePadModal(jd, slot));
+      bindSignaturePadModal(jd, slot, session, ()=>{ openModal(renderSmartJdManageModal(jd)); bindSmartJdManageModal(jd, session); });
+    };
+  });
+}
+
+/* ---------- signature pad: draw online, or attach an image ---------- */
+function renderSignaturePadModal(jd, slot){
+  const sig = (jd.signatures && jd.signatures[slot.key]) || {};
+  return `
+  <div class="modal-overlay" id="jd-sig-overlay">
+    <div class="card" style="max-width:480px;width:100%;margin:8vh auto;">
+      <div class="flex-between"><h3>เซ็น — ${slot.label}</h3><button class="btn btn-ghost btn-sm" id="jd-sig-close">ปิด</button></div>
+      <div class="grid grid-2 mt-16">
+        <div><label class="small muted">ชื่อ-นามสกุล</label><input id="jd-sig-name" value="${escapeHtml(sig.name||"")}"></div>
+        <div><label class="small muted">ตำแหน่ง</label><input id="jd-sig-position" value="${escapeHtml(sig.position||"")}"></div>
+      </div>
+      <div class="small muted mt-16">วาดลายเซ็นด้านล่าง หรือแนบรูปลายเซ็นแทน</div>
+      <canvas id="jd-sig-canvas" width="420" height="140" style="border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none;width:100%;height:140px;margin-top:8px;"></canvas>
+      <div class="flex gap-8 mt-8">
+        <button class="btn btn-ghost btn-sm" id="jd-sig-clear">ล้าง</button>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;">แนบรูปลายเซ็น<input type="file" id="jd-sig-upload" accept="image/*" style="display:none;"></label>
+      </div>
+      <button class="btn btn-primary mt-16" id="jd-sig-save-btn">บันทึกลายเซ็น</button>
+    </div>
+  </div>`;
+}
+function bindSignaturePadModal(jd, slot, session, onDone){
+  MODAL_OPEN = true;
+  const close = ()=>{ MODAL_OPEN = false; closeModal("jd-sig-overlay"); };
+  document.getElementById("jd-sig-close").onclick = ()=>{ close(); onDone && onDone(); };
+
+  const canvas = document.getElementById("jd-sig-canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "#1a1a1a";
+  let drawing = false, hasDrawn = false, uploadedDataUrl = null;
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    return { x: cx * (canvas.width/r.width), y: cy * (canvas.height/r.height) };
+  }
+  function start(e){ drawing = true; uploadedDataUrl = null; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); }
+  function move(e){ if(!drawing) return; const p = pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasDrawn = true; e.preventDefault(); }
+  function end(){ drawing = false; }
+  canvas.addEventListener("mousedown", start); canvas.addEventListener("mousemove", move); window.addEventListener("mouseup", end);
+  canvas.addEventListener("touchstart", start); canvas.addEventListener("touchmove", move); canvas.addEventListener("touchend", end);
+
+  document.getElementById("jd-sig-clear").onclick = ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); hasDrawn = false; uploadedDataUrl = null; };
+  document.getElementById("jd-sig-upload").onchange = (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      uploadedDataUrl = reader.result;
+      const img = new Image();
+      img.onload = ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0,canvas.width,canvas.height); hasDrawn = true; };
+      img.src = uploadedDataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  document.getElementById("jd-sig-save-btn").onclick = async ()=>{
+    const name = document.getElementById("jd-sig-name").value.trim();
+    if(!name){ toast("กรุณากรอกชื่อ-นามสกุล"); return; }
+    if(!hasDrawn){ toast("กรุณาวาดลายเซ็น หรือแนบรูปลายเซ็น"); return; }
+    jd.signatures = jd.signatures || {};
+    jd.signatures[slot.key] = {
+      name, position: document.getElementById("jd-sig-position").value.trim(),
+      date: fmtDateTime(new Date().toISOString()),
+      sigDataUrl: uploadedDataUrl || canvas.toDataURL("image/png"),
+      signedAt: new Date().toISOString()
+    };
+    const btn = document.getElementById("jd-sig-save-btn"); btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+    try{
+      await generateAndSaveSmartJdPdf(jd, {download:false});
+      await persistSmartJD(jd, `เซ็น Smart JD: ${slot.label}`);
+      close(); onDone && onDone();
+      renderRoute(session);
+      toast("เซ็นเรียบร้อย");
+    }catch(e){ btn.disabled = false; btn.textContent = "บันทึกลายเซ็น"; toast("บันทึกไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+  };
+}
+
+/* ---------- employee: view + sign assigned JDs ---------- */
+function renderEmployeeMyJD(session){
+  const mine = (DB.smartJDs||[]).filter(jd=>jd.assignedEmployeeId===session.employeeId);
+  return `
+  <div class="card mb-16">
+    <b>Job Description ของฉัน</b>
+    <div class="small muted mt-4">เอกสาร Smart Job Description (F-PM-25) ที่ HR มอบหมายให้คุณ — กดเซ็นรับทราบได้จากที่นี่</div>
+  </div>
+  ${mine.length ? mine.map(jd=>{
+    const mySig = jd.signatures && jd.signatures.employee;
+    return `<div class="card mb-16">
+      <div class="flex-between">
+        <div><b>${escapeHtml(jd.position)}</b><div class="small muted">${jdOrgLabel(jd)}</div></div>
+        ${smartJdStatusPill(jd)}
+      </div>
+      <div class="flex gap-8 mt-16">
+        ${jd.drivePdfUrl?`<a href="${escapeHtml(jd.drivePdfUrl)}" target="_blank" class="btn btn-ghost btn-sm">📄 ดู PDF</a>`:""}
+        <button class="btn ${mySig?'btn-ghost':'btn-primary'} btn-sm" data-jd-self-sign="${jd.id}">${mySig?'เซ็นใหม่':'เซ็นรับทราบ'}</button>
+      </div>
+    </div>`;
+  }).join("") : `<div class="card muted">ยังไม่มี Job Description ที่มอบหมายให้คุณ</div>`}`;
 }
 
 /* =========================================================================
@@ -1802,6 +2397,29 @@ function bindAfterRoute(session){
     el.onclick = ()=>{
       const rf = DB.redFlagCases.find(c=>c.id===el.dataset.rfManage);
       openModal(renderRedFlagManageModal(rf)); bindRedFlagManageModal(rf, session);
+    };
+  });
+
+  // Smart Job Description
+  document.getElementById("jd-new-btn")?.addEventListener("click", ()=>{
+    const jd = blankSmartJD(); jd._isNew = true;
+    openModal(renderSmartJdFormModal(jd)); bindSmartJdFormModal(jd, session);
+  });
+  document.getElementById("jd-registry-btn")?.addEventListener("click", ()=>{
+    openModal(renderPositionRegistryModal()); bindPositionRegistryModal(session);
+  });
+  document.querySelectorAll("[data-jd-manage]").forEach(el=>{
+    el.onclick = ()=>{
+      const jd = DB.smartJDs.find(d=>d.id===el.dataset.jdManage);
+      openModal(renderSmartJdManageModal(jd)); bindSmartJdManageModal(jd, session);
+    };
+  });
+  document.querySelectorAll("[data-jd-self-sign]").forEach(el=>{
+    el.onclick = ()=>{
+      const jd = DB.smartJDs.find(d=>d.id===el.dataset.jdSelfSign);
+      const slot = JD_SIG_SLOTS[0]; // "employee"
+      openModal(renderSignaturePadModal(jd, slot));
+      bindSignaturePadModal(jd, slot, session, null);
     };
   });
 
