@@ -1322,12 +1322,18 @@ async function generateSmartJdPdfBytes(jd){
       y -= 44;
       page.drawLine({start:{x:MARGIN,y}, end:{x:PAGE_W-MARGIN,y}, thickness:1, color:BLACK});
       y -= 18;
-      page.drawText(`แผนก : ${jd.department||""}`, {x:MARGIN, y, size:11, font});
-      page.drawText(`ส่วน : ${jd.section||""}`, {x:MARGIN+190, y, size:11, font});
-      page.drawText(`ฝ่าย : ${jd.division||""}`, {x:MARGIN+370, y, size:11, font});
-      y -= 20;
-      page.drawText(`ตำแหน่งงาน : ${jd.position||""}`, {x:MARGIN, y, size:12, font:fontBold});
-      y -= 18;
+      [["แผนก", jd.department], ["ส่วน", jd.section], ["ฝ่าย", jd.division]].forEach(([label, val])=>{
+        wrapText(font, 11, CONTENT_W, `${label} : ${val||""}`).forEach(ln=>{
+          page.drawText(ln, {x:MARGIN, y, size:11, font});
+          y -= 15;
+        });
+      });
+      y -= 3;
+      wrapText(fontBold, 12, CONTENT_W, `ตำแหน่งงาน : ${jd.position||""}`).forEach(ln=>{
+        page.drawText(ln, {x:MARGIN, y, size:12, font:fontBold});
+        y -= 16;
+      });
+      y -= 2;
     } else {
       page.drawText(`${jd.docNo||"F-PM-25"} — Smart Job Description — ${jd.position||""}`, {x:MARGIN, y:y-9, size:8, font, color:GRAY});
       y -= 20;
