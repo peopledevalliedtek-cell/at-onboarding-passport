@@ -1036,11 +1036,13 @@ function renderEmployeePassport(emp){
 }
 
 function renderEmployeeJourney(emp){
+  const tpl = DB.templates.find(t=>t.id===emp.templateId);
   const tabs = Object.entries(emp.checklist);
   STATE.params.activePhase = STATE.params.activePhase || tabs[0][0];
-  const tabHtml = tabs.map(([key,ph])=>`<div class="tab ${STATE.params.activePhase===key?'active':''}" data-phase-tab="${key}">${escapeHtml(ph.title.split("·")[0].trim())}</div>`).join("");
+  const phaseTitle = (key)=> (tpl && tpl.checklist[key] && tpl.checklist[key].title) || key;
+  const tabHtml = tabs.map(([key])=>`<div class="tab ${STATE.params.activePhase===key?'active':''}" data-phase-tab="${key}">${escapeHtml(phaseTitle(key).split("·")[0].trim())}</div>`).join("");
   const active = emp.checklist[STATE.params.activePhase];
-  const title = tabs.find(([k])=>k===STATE.params.activePhase)[1].title;
+  const title = phaseTitle(STATE.params.activePhase);
   return `
   <div class="card">
     <div class="tabs">${tabHtml}</div>
