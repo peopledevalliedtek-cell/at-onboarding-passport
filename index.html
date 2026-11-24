@@ -16,6 +16,8 @@
   --red:#c0272d; --red-dark:#8f1e23; --ink:#1f2328; --sub:#5b6168;
   --bg:#f5f6f8; --card:#ffffff; --line:#e5e7eb; --green:#1a7f45; --amber:#b8860b;
   --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.06);
+  --navy-dark:#0a1e3d; --navy:#122a52; --blue:#2f6fed; --blue-soft:#eaf1ff;
+  --purple:#7c5cf0; --purple-soft:#f1ecfe; --green-soft:#e7f6ef; --amber-soft:#fbf0dc;
   font-size:16px;
 }
 *{box-sizing:border-box;}
@@ -109,17 +111,17 @@ textarea{min-height:60px;resize:vertical;}
 
 /* ---------- App shell ---------- */
 #shell{flex:1;display:flex;min-height:100vh;}
-.sidebar{width:230px;flex:none;background:#1a1d21;color:#fff;display:flex;flex-direction:column;padding:16px 10px;}
+.sidebar{width:230px;flex:none;background:var(--navy-dark);color:#fff;display:flex;flex-direction:column;padding:16px 10px;}
 .brand{display:flex;align-items:center;gap:10px;padding:8px 10px 18px;}
 .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--red);display:flex;align-items:center;
   justify-content:center;font-weight:800;font-size:14px;flex:none;}
 .brand .txt{font-weight:800;font-size:14.5px;line-height:1.2;}
-.brand .txt small{display:block;font-weight:500;color:#9aa0a6;font-size:10.5px;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:#c7cbd1;
+.brand .txt small{display:block;font-weight:500;color:#9fb0cc;font-size:10.5px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:#c3cee3;
   font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:2px;}
-.nav-item:hover{background:#25292e;color:#fff;}
-.nav-item.active{background:var(--red);color:#fff;}
-.side-foot{margin-top:auto;padding:10px;font-size:11.5px;color:#7d838a;}
+.nav-item:hover{background:#17335f;color:#fff;}
+.nav-item.active{background:var(--blue);color:#fff;}
+.side-foot{margin-top:auto;padding:10px;font-size:11.5px;color:#9fb0cc;}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;}
 .topbar{background:#fff;border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;
   justify-content:space-between;gap:10px;position:sticky;top:0;z-index:40;}
@@ -136,15 +138,57 @@ textarea{min-height:60px;resize:vertical;}
 .avatar{width:34px;height:34px;border-radius:999px;background:#eef0f2;display:flex;align-items:center;
   justify-content:center;font-weight:700;font-size:13px;color:var(--sub);flex:none;}
 
-/* passport cover */
-.passport-cover{background:linear-gradient(135deg,#c0272d,#7d1a1f);color:#fff;border-radius:16px;padding:22px 24px;
-  margin-bottom:16px;}
-.passport-cover .tag{font-size:11.5px;letter-spacing:.08em;opacity:.85;text-transform:uppercase;}
-.passport-cover h1{font-size:22px;margin:4px 0 2px;}
-.passport-cover .meta{font-size:13px;opacity:.9;margin-top:6px;}
+/* passport cover / My Passport hero */
+.passport-hero{position:relative;border-radius:18px;overflow:hidden;color:#fff;margin-bottom:16px;
+  background-image:linear-gradient(100deg, rgba(10,20,40,.82) 25%, rgba(10,20,40,.45) 65%, rgba(10,20,40,.15) 100%),
+  url('assets/hero/allied-tek-building.webp');
+  background-size:cover;background-position:center 40%;padding:26px 26px;}
+.passport-hero .tag{font-size:12.5px;letter-spacing:.02em;opacity:.95;font-weight:600;}
+.passport-hero h1{font-size:22px;margin:4px 0 2px;}
+.passport-hero .meta{font-size:13px;opacity:.92;margin-top:6px;}
 .timeline{display:flex;gap:6px;margin-top:14px;}
-.timeline .seg{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.25);overflow:hidden;}
+.timeline .seg{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.3);overflow:hidden;}
 .timeline .seg b{display:block;height:100%;background:#fff;}
+
+.info-card{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:13px;}
+.info-card .ic{width:40px;height:40px;border-radius:50%;flex:none;display:flex;align-items:center;
+  justify-content:center;font-size:18px;}
+.info-card .ic-blue{background:var(--blue-soft);}
+.info-card .ic-purple{background:var(--purple-soft);}
+.info-card .ic-green{background:var(--green-soft);}
+.info-card .lbl{font-size:11px;color:var(--sub);}
+.info-card .val{font-weight:700;font-size:14px;margin-top:1px;}
+.info-card .sub2{font-size:12px;color:var(--sub);}
+
+.passport-block{background:var(--navy);color:#fff;border-radius:16px;padding:20px 24px;display:flex;
+  align-items:center;gap:22px;flex-wrap:wrap;}
+.passport-block .ring{width:72px;height:72px;border-radius:50%;border:3px solid rgba(255,255,255,.3);
+  display:flex;align-items:center;justify-content:center;flex:none;font-size:26px;}
+.passport-block .code{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;}
+.passport-block .code-lbl{font-size:11.5px;color:#aebbd6;}
+.passport-block .kv{flex:1;min-width:200px;border-left:1px solid rgba(255,255,255,.18);padding-left:22px;
+  display:flex;flex-direction:column;gap:7px;}
+.passport-block .kv div{display:flex;justify-content:space-between;font-size:13px;}
+.passport-block .kv span.k{color:#aebbd6;}
+.passport-block .kv span.v{font-weight:600;font-variant-numeric:tabular-nums;}
+
+.quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
+.quick-item{background:var(--bg);border-radius:12px;padding:13px 6px;display:flex;flex-direction:column;
+  align-items:center;gap:6px;font-size:11.5px;text-align:center;cursor:pointer;border:none;color:var(--ink);
+  font-family:inherit;}
+.quick-item .em{font-size:19px;}
+.quick-item.blue{background:var(--blue-soft);}
+.quick-item.green{background:var(--green-soft);}
+.quick-item.purple{background:var(--purple-soft);}
+.quick-item.amber{background:var(--amber-soft);}
+.quick-item.red{background:#fbe9e8;}
+
+.stat-ring-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;}
+.stat-ring{width:48px;height:48px;border-radius:50%;border:3px solid var(--blue);margin:0 auto 8px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;}
+.stat-num{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;}
+.stat-lbl{font-size:10.5px;color:var(--sub);margin-top:2px;}
 </style>
 </head>
 <body>
@@ -2205,25 +2249,73 @@ function renderSupervisorApproval(session){
 function renderEmployeePassport(emp){
   const p = employeeProgress(emp);
   const end = employeeEndDate(emp);
+  const dayNo = employeeDayNumber(emp);
+  const examRes = getExamResult(emp, "round1");
+  const examLabel = examRes ? `${examRes.auto}/${examRes.autoMax}` : "ยังไม่ทำ";
+
   return `
-  <div class="passport-cover">
+  <div class="passport-hero">
     <div class="flex gap-16" style="align-items:flex-start;">
       <div style="position:relative;flex:none;">
         ${emp.photoUrl
           ? `<img src="${escapeHtml(emp.photoUrl)}" style="width:84px;height:84px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,.4);">`
-          : `<div style="width:84px;height:84px;border-radius:16px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;border:3px solid rgba(255,255,255,.3);">${escapeHtml((emp.fullName||"?").slice(0,1))}</div>`}
+          : `<div style="width:84px;height:84px;border-radius:16px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;border:3px solid rgba(255,255,255,.35);">${escapeHtml((emp.fullName||"?").slice(0,1))}</div>`}
         <label class="btn btn-ghost btn-sm" style="position:absolute;bottom:-8px;right:-8px;padding:4px 7px;cursor:pointer;" title="เปลี่ยนรูปโปรไฟล์">
           📷<input type="file" accept="image/*" id="photo-upload-input" style="display:none;">
         </label>
       </div>
       <div style="flex:1;min-width:0;">
-        <div class="tag">New Hire Passport</div>
+        <div class="tag">ยินดีต้อนรับสู่ AT Digital HR Platform</div>
         <h1>${escapeHtml(emp.fullName||"-")} ${emp.nickname?`(${escapeHtml(emp.nickname)})`:""}</h1>
         <div class="meta">${escapeHtml(emp.position||"-")} · ${escapeHtml(emp.department||"-")}</div>
         <div class="meta">เริ่มงาน ${fmtDate(emp.startDate)} · ครบกำหนด ${emp.durationDays} วัน (${fmtDate(end)})</div>
         <div class="timeline"><div class="seg"><b style="width:${p}%"></b></div></div>
-        <div class="meta mt-8">ความคืบหน้า ${p}% · วันที่ ${employeeDayNumber(emp)} จาก ${emp.durationDays} วัน</div>
+        <div class="meta mt-8">ความคืบหน้า ${p}% · วันที่ ${dayNo} จาก ${emp.durationDays} วัน</div>
       </div>
+    </div>
+  </div>
+
+  <div class="grid grid-3 mt-16">
+    <div class="info-card">
+      <div class="ic ic-blue">👤</div>
+      <div><div class="lbl">ชื่อ-นามสกุล</div><div class="val">${escapeHtml(emp.fullName||"-")}</div><div class="sub2">${escapeHtml(emp.position||"-")}</div></div>
+    </div>
+    <div class="info-card">
+      <div class="ic ic-purple">📅</div>
+      <div><div class="lbl">ตำแหน่งปัจจุบัน</div><div class="val">${escapeHtml(emp.position||"-")}</div><div class="sub2">เริ่มงาน ${fmtDate(emp.startDate)}</div></div>
+    </div>
+    <div class="info-card">
+      <div class="ic ic-green">🏢</div>
+      <div><div class="lbl">HR ผู้ดูแล</div><div class="val">${escapeHtml(emp.hrContact?.name||"-")}</div><div class="sub2">${escapeHtml(emp.hrContact?.position||"-")}</div></div>
+    </div>
+  </div>
+
+  <div class="passport-block mt-16">
+    <div class="ring">🛂</div>
+    <div><div class="code">${escapeHtml(emp.employeeCode||"-")}</div><div class="code-lbl">รหัสพนักงาน</div></div>
+    <div class="kv">
+      <div><span class="k">วันเริ่มงาน</span><span class="v">${fmtDate(emp.startDate)}</span></div>
+      <div><span class="k">วันครบกำหนดทดลองงาน</span><span class="v">${fmtDate(end)}</span></div>
+      <div><span class="k">สถานะ</span><span class="v">${employeeMilestone(emp).label}</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">⚡ เมนูด่วน</div>
+  <div class="quick-grid">
+    <button class="quick-item blue" data-goto="journey"><span class="em">🧭</span>My Journey</button>
+    <button class="quick-item green" data-goto="exam"><span class="em">📝</span>ข้อสอบปฐมนิเทศ</button>
+    <button class="quick-item purple" data-goto="reflection"><span class="em">💬</span>Feedback</button>
+    <button class="quick-item amber" data-goto="policies"><span class="em">📘</span>นโยบาย/สวัสดิการ</button>
+    <button class="quick-item red" data-goto="redflag"><span class="em">🚩</span>แจ้งปัญหา</button>
+    <button class="quick-item blue" data-goto="myjd"><span class="em">🗒️</span>Job Description</button>
+  </div>
+
+  <div class="section-title">📊 สรุปข้อมูลของคุณ</div>
+  <div class="card">
+    <div class="stat-ring-grid">
+      <div><div class="stat-ring">✅</div><div class="stat-num">${p}%</div><div class="stat-lbl">Checklist เสร็จแล้ว</div></div>
+      <div><div class="stat-ring">📅</div><div class="stat-num">${dayNo}/${emp.durationDays}</div><div class="stat-lbl">วันที่ทดลองงาน</div></div>
+      <div><div class="stat-ring">📝</div><div class="stat-num">${examLabel}</div><div class="stat-lbl">คะแนนสอบปฐมนิเทศ</div></div>
     </div>
   </div>
 
@@ -2239,15 +2331,6 @@ function renderEmployeePassport(emp){
         <div class="small mt-8">${escapeHtml(c.phone||"-")}</div>
       </div>`;
     }).join("")}
-  </div>
-
-  <div class="section-title">รหัสพนักงาน / ข้อมูลพื้นฐาน</div>
-  <div class="card">
-    <table>
-      <tr><th>รหัสพนักงาน</th><td>${escapeHtml(emp.employeeCode||"-")}</td></tr>
-      <tr><th>วันเริ่มงาน</th><td>${fmtDate(emp.startDate)}</td></tr>
-      <tr><th>วันครบกำหนดทดลองงาน</th><td>${fmtDate(end)}</td></tr>
-    </table>
   </div>`;
 }
 
@@ -2410,6 +2493,10 @@ function bindExamReviewButtons(root){
 
 function bindAfterRoute(session){
   bindChecklistOpeners(session);
+
+  document.querySelectorAll("[data-goto]").forEach(el=>{
+    el.onclick = ()=>{ STATE.route = el.dataset.goto; STATE.params = {}; render(); };
+  });
 
   // Red Flag & Employee Support
   document.getElementById("rf-new-btn")?.addEventListener("click", ()=>{
