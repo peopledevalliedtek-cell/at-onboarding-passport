@@ -409,7 +409,7 @@ async function persistUsers(){
 function startPolling(){
   if(POLL_TIMER) return;
   POLL_TIMER = setInterval(async ()=>{
-    if(MODAL_OPEN || !API_URL) return;
+    if(MODAL_OPEN || !API_URL || !getSession()) return;
     try{ await refreshDB(); render(); }catch(e){ /* keep last good state on a transient network error */ }
   }, 4000);
 }
