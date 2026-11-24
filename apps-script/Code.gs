@@ -59,6 +59,10 @@ function doPost(e) {
     if (action === 'deleteTemplate') { deleteTemplate_(body.id); return jsonResponse_({ ok: true }); }
     if (action === 'setEmployee') { upsertEmployee_(body.id, body.data); return jsonResponse_({ ok: true }); }
     if (action === 'deleteEmployee') { deleteEmployee_(body.id); return jsonResponse_({ ok: true }); }
+    if (action === 'uploadPhoto') {
+      var photo = uploadEmployeePhoto_(body.id, body.filename, body.mimeType, body.base64);
+      return jsonResponse_({ ok: true, photoUrl: photo.photoUrl });
+    }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
   } catch (err) {
     return jsonResponse_({ ok: false, error: String(err) });
@@ -83,7 +87,7 @@ function setupSheets() {
   ensureSheet_(ss, SHEETS.EMPLOYEES, [
     'รหัสอ้างอิง', 'รหัสพนักงาน', 'ชื่อ-นามสกุล', 'ชื่อเล่น', 'ตำแหน่ง', 'แผนก / ทีม',
     'วันเริ่มงาน', 'ระยะเวลาทดลองงาน (วัน)', 'วันครบกำหนด', 'ความคืบหน้า (%)', 'สถานะ',
-    'Template ที่ใช้', 'พี่เลี้ยง', 'หัวหน้าโดยตรง', 'HR ผู้ดูแล', 'อัปเดตล่าสุด',
+    'Template ที่ใช้', 'พี่เลี้ยง', 'หัวหน้าโดยตรง', 'HR ผู้ดูแล', 'รูปโปรไฟล์ (ลิงก์)', 'อัปเดตล่าสุด',
     'ข้อมูลเต็ม (JSON — ใช้งานในระบบ ไม่ต้องแก้ตรงนี้)'
   ]);
   ensureSheet_(ss, SHEETS.CHECKLIST, [
@@ -341,7 +345,7 @@ function readEmployees_() {
   var values = sheet.getDataRange().getValues();
   var out = [];
   for (var i = 1; i < values.length; i++) {
-    var json = values[i][16];
+    var json = values[i][17];
     if (!json) continue;
     try { out.push(JSON.parse(json)); } catch (e) { /* skip bad row */ }
   }
@@ -357,7 +361,7 @@ function upsertEmployee_(id, data) {
     id, data.employeeCode || '', data.fullName || '', data.nickname || '', data.position || '', data.department || '',
     data.startDate || '', data.durationDays || '', endDate, progress, statusLabel_(data.status),
     templateNameFor_(data.templateId), contactLabel_(data.mentor), contactLabel_(data.supervisor), contactLabel_(data.hrContact),
-    new Date().toISOString(), JSON.stringify(data)
+    data.photoUrl || '', new Date().toISOString(), JSON.stringify(data)
   ];
   if (row === -1) sheet.appendRow(values);
   else sheet.getRange(row, 1, 1, values.length).setValues([values]);
@@ -372,6 +376,50 @@ function deleteEmployee_(id) {
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.CHECKLIST), id);
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.KPI), id);
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.REFLECTION), id);
+}
+
+/* ---- profile photo upload (stored in Google Drive, linked onto the employee record) ---- */
+
+var PHOTO_DRIVE_ROOT_FOLDER_NAME = 'AT Onboarding Passport - Profile Photos';
+
+function getEmployeeJson_(id) {
+  var sheet = sheetByName_(SHEETS.EMPLOYEES);
+  var row = findRowByFirstCol_(sheet, id);
+  if (row === -1) return null;
+  var json = sheet.getRange(row, 18).getValue();
+  try { return JSON.parse(json); } catch (e) { return null; }
+}
+
+function getOrCreateRootFolder_(name) {
+  var it = DriveApp.getFoldersByName(name);
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder(name);
+}
+
+function uploadEmployeePhoto_(id, filename, mimeType, base64) {
+  if (!id) throw new Error('missing id');
+  if (!base64) throw new Error('missing image data');
+  var folder = getOrCreateRootFolder_(PHOTO_DRIVE_ROOT_FOLDER_NAME);
+
+  // Replace any previous photo for this employee so the folder doesn't pile up old copies.
+  var prefix = 'profile_' + id;
+  var existing = folder.getFiles();
+  while (existing.hasNext()) {
+    var f = existing.next();
+    if (f.getName().indexOf(prefix) === 0) f.setTrashed(true);
+  }
+
+  var bytes = Utilities.base64Decode(base64);
+  var ext = (mimeType && mimeType.indexOf('png') !== -1) ? '.png' : '.jpg';
+  var blob = Utilities.newBlob(bytes, mimeType || 'image/jpeg', prefix + ext);
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var photoUrl = 'https://lh3.googleusercontent.com/d/' + file.getId() + '=s400';
+  var data = getEmployeeJson_(id) || {};
+  data.photoUrl = photoUrl;
+  upsertEmployee_(id, data);
+  return { photoUrl: photoUrl };
 }
 
 function templateNameFor_(templateId) {

@@ -356,6 +356,41 @@ async function persistEmployee(emp){
 async function persistDeleteEmployee(id){
   await apiCall("deleteEmployee", {id});
 }
+function resizeImageToDataUrl(file, size){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width-side)/2, sy = (img.height-side)/2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadPhoto(empId, file){
+  const dataUrl = await resizeImageToDataUrl(file, 480);
+  const mime = dataUrl.slice(5, dataUrl.indexOf(";"));
+  const base64 = dataUrl.slice(dataUrl.indexOf(",")+1);
+  const res = await apiCall("uploadPhoto", {id: empId, filename: file.name, mimeType: mime, base64});
+  return res.photoUrl;
+}
+function avatarImgHtml(photoUrl, name, size){
+  size = size || 34;
+  if(photoUrl){
+    return `<img src="${escapeHtml(photoUrl)}" alt="${escapeHtml(name||'')}" style="width:${size}px;height:${size}px;border-radius:999px;object-fit:cover;flex:none;">`;
+  }
+  return `<div class="avatar" style="width:${size}px;height:${size}px;flex:none;">${escapeHtml((name||"?").slice(0,1))}</div>`;
+}
 async function persistTemplate(tpl){
   await apiCall("setTemplate", {id: tpl.id, data: tpl});
 }
@@ -389,7 +424,7 @@ function newEmployeeFromTemplate(tpl){
   return {
     id: uid("emp"),
     employeeCode:"", fullName:"", nickname:"", position:"", department: tpl.department,
-    team:"", startDate: today(),
+    team:"", startDate: today(), photoUrl:"",
     templateId: tpl.id, durationDays: tpl.durationDays,
     mentor:{name:"",position:"",phone:"",line:""},
     supervisor:{name:"",position:"",phone:"",line:""},
@@ -579,9 +614,11 @@ function renderShell(session){
       <span>${it.icon}</span><span>${it.label}</span>
     </div>`).join("");
   let headerName = session.name;
+  let headerPhoto = "";
   if(session.role === "employee"){
     const emp = DB.employees.find(e=>e.id===session.employeeId);
     headerName = emp ? emp.fullName : "พนักงาน";
+    headerPhoto = emp ? emp.photoUrl : "";
   }
   return `
   <div id="shell">
@@ -601,7 +638,7 @@ function renderShell(session){
           <h2 id="page-title"></h2>
         </div>
         <div class="flex gap-10">
-          <div class="avatar">${(headerName||"?").slice(0,1)}</div>
+          ${avatarImgHtml(headerPhoto, headerName, 34)}
         </div>
       </div>
       <div class="content" id="content"></div>
@@ -679,7 +716,7 @@ function renderHRDashboard(){
         ${active.length ? active.map(e=>{
           const m = employeeMilestone(e); const p = employeeProgress(e);
           return `<tr>
-            <td><b>${escapeHtml(e.fullName||"-")}</b><div class="small muted">${escapeHtml(e.employeeCode||"")}</div></td>
+            <td><div class="flex gap-8">${avatarImgHtml(e.photoUrl, e.fullName, 30)}<div><b>${escapeHtml(e.fullName||"-")}</b><div class="small muted">${escapeHtml(e.employeeCode||"")}</div></div></div></td>
             <td>${escapeHtml(e.position||"-")}<div class="small muted">${escapeHtml(e.department||"-")}</div></td>
             <td>${fmtDate(e.startDate)}</td>
             <td>วันที่ ${employeeDayNumber(e)} / ${e.durationDays}</td>
@@ -708,7 +745,7 @@ function renderEmployeeManagement(){
         const p = employeeProgress(e);
         return `<tr>
           <td>${escapeHtml(e.employeeCode||"-")}</td>
-          <td><b>${escapeHtml(e.fullName||"(ยังไม่กรอกชื่อ)")}</b></td>
+          <td><div class="flex gap-8">${avatarImgHtml(e.photoUrl, e.fullName, 28)}<b>${escapeHtml(e.fullName||"(ยังไม่กรอกชื่อ)")}</b></div></td>
           <td>${escapeHtml(e.position||"-")}<div class="small muted">${escapeHtml(e.department||"-")}</div></td>
           <td class="small">${tpl?escapeHtml(tpl.name):"-"}</td>
           <td>${fmtDate(e.startDate)}</td>
@@ -914,7 +951,7 @@ function renderTeamList(filterText){
     const p = employeeProgress(e); const m = employeeMilestone(e);
     return `<div class="card mt-16">
       <div class="flex-between">
-        <div><h3>${escapeHtml(e.fullName||"-")}</h3><div class="small muted">${escapeHtml(e.position)} · ${escapeHtml(e.department)} · เริ่มงาน ${fmtDate(e.startDate)}</div></div>
+        <div class="flex gap-8">${avatarImgHtml(e.photoUrl, e.fullName, 40)}<div><h3>${escapeHtml(e.fullName||"-")}</h3><div class="small muted">${escapeHtml(e.position)} · ${escapeHtml(e.department)} · เริ่มงาน ${fmtDate(e.startDate)}</div></div></div>
         <span class="pill pill-gray">${m.label}</span>
       </div>
       <div class="progress-track mt-8"><div class="progress-fill" style="width:${p}%"></div></div>
@@ -954,12 +991,24 @@ function renderEmployeePassport(emp){
   const end = employeeEndDate(emp);
   return `
   <div class="passport-cover">
-    <div class="tag">New Hire Passport</div>
-    <h1>${escapeHtml(emp.fullName||"-")} ${emp.nickname?`(${escapeHtml(emp.nickname)})`:""}</h1>
-    <div class="meta">${escapeHtml(emp.position||"-")} · ${escapeHtml(emp.department||"-")}</div>
-    <div class="meta">เริ่มงาน ${fmtDate(emp.startDate)} · ครบกำหนด ${emp.durationDays} วัน (${fmtDate(end)})</div>
-    <div class="timeline"><div class="seg"><b style="width:${p}%"></b></div></div>
-    <div class="meta mt-8">ความคืบหน้า ${p}% · วันที่ ${employeeDayNumber(emp)} จาก ${emp.durationDays} วัน</div>
+    <div class="flex gap-16" style="align-items:flex-start;">
+      <div style="position:relative;flex:none;">
+        ${emp.photoUrl
+          ? `<img src="${escapeHtml(emp.photoUrl)}" style="width:84px;height:84px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,.4);">`
+          : `<div style="width:84px;height:84px;border-radius:16px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;border:3px solid rgba(255,255,255,.3);">${escapeHtml((emp.fullName||"?").slice(0,1))}</div>`}
+        <label class="btn btn-ghost btn-sm" style="position:absolute;bottom:-8px;right:-8px;padding:4px 7px;cursor:pointer;" title="เปลี่ยนรูปโปรไฟล์">
+          📷<input type="file" accept="image/*" id="photo-upload-input" style="display:none;">
+        </label>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div class="tag">New Hire Passport</div>
+        <h1>${escapeHtml(emp.fullName||"-")} ${emp.nickname?`(${escapeHtml(emp.nickname)})`:""}</h1>
+        <div class="meta">${escapeHtml(emp.position||"-")} · ${escapeHtml(emp.department||"-")}</div>
+        <div class="meta">เริ่มงาน ${fmtDate(emp.startDate)} · ครบกำหนด ${emp.durationDays} วัน (${fmtDate(end)})</div>
+        <div class="timeline"><div class="seg"><b style="width:${p}%"></b></div></div>
+        <div class="meta mt-8">ความคืบหน้า ${p}% · วันที่ ${employeeDayNumber(emp)} จาก ${emp.durationDays} วัน</div>
+      </div>
+    </div>
   </div>
 
   <div class="section-title">คนที่พึ่งได้ — ติดอะไรถามใคร</div>
@@ -1189,6 +1238,20 @@ function bindAfterRoute(session){
       bindReflectionModal(session.employeeId, el.dataset.fillReflection, "employee", session);
     };
   });
+  const photoInput = document.getElementById("photo-upload-input");
+  if(photoInput){
+    photoInput.addEventListener("change", async (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      toast("กำลังอัปโหลดรูป...");
+      try{
+        const emp = DB.employees.find(e=>e.id===session.employeeId);
+        const photoUrl = await uploadPhoto(session.employeeId, file);
+        emp.photoUrl = photoUrl;
+        renderRoute(session);
+        toast("อัปเดตรูปโปรไฟล์แล้ว");
+      }catch(err){ toast("อัปโหลดรูปไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ"); }
+    });
+  }
 }
 
 function bindChecklistOpeners(session){
