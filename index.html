@@ -1220,29 +1220,8 @@ function renderEmployeePassport(emp){
 }
 
 function renderEmployeeJourney(emp){
-  const tpl = DB.templates.find(t=>t.id===emp.templateId);
-  const tabs = Object.entries(emp.checklist);
-  STATE.params.activePhase = STATE.params.activePhase || tabs[0][0];
-  const phaseTitle = (key)=> (tpl && tpl.checklist[key] && tpl.checklist[key].title) || key;
-  const tabHtml = tabs.map(([key])=>`<div class="tab ${STATE.params.activePhase===key?'active':''}" data-phase-tab="${key}">${escapeHtml(phaseTitle(key).split("·")[0].trim())}</div>`).join("");
-  const active = emp.checklist[STATE.params.activePhase];
-  const title = phaseTitle(STATE.params.activePhase);
   return `
-  <div class="card">
-    <div class="small muted mb-8">รายการนี้ให้พี่เลี้ยง/หัวหน้างาน หรือ HR เป็นผู้ติ๊กยืนยันให้ — ฝั่งของคุณดูความคืบหน้าได้อย่างเดียว</div>
-    <div class="tabs">${tabHtml}</div>
-    <h3 class="mt-16">${escapeHtml(title)}</h3>
-    ${active.map(item=>`
-      <div class="checklist-row">
-        <div class="chk-box ${item.done?'done':''}" style="cursor:default;">${item.done?'✓':''}</div>
-        <div>
-          <div>${escapeHtml(item.label)}</div>
-          ${item.note?`<div class="small muted mt-8">หมายเหตุ: ${escapeHtml(item.note)}</div>`:""}
-        </div>
-        <div class="small muted">${item.date?fmtDate(item.date):""}</div>
-      </div>`).join("")}
-  </div>
-  <div class="section-title">ตัวชี้วัดช่วงทดลองงาน (KPI)</div>
+  <div class="section-title" style="margin-top:0;">ตัวชี้วัดช่วงทดลองงาน (KPI)</div>
   <div class="card">
     <table>
       <thead><tr><th>ตัววัด</th><th>เป้าหมาย</th><th>ดูจากที่ไหน</th></tr></thead>
