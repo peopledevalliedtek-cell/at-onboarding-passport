@@ -23,6 +23,7 @@ var SHEETS = {
   CHECKLIST: 'Checklist Onboarding',
   KPI: 'ตัวชี้วัด KPI ทดลองงาน',
   REFLECTION: 'แบบสะท้อน 2 ทาง',
+  EXAM: 'ผลสอบปฐมนิเทศ',
   USERS: 'ผู้ใช้งานระบบ'
 };
 
@@ -99,6 +100,10 @@ function setupSheets() {
   ]);
   ensureSheet_(ss, SHEETS.REFLECTION, [
     'รหัสพนักงาน', 'ชื่อ-นามสกุล', 'รอบ', 'ผู้ตอบ', 'ข้อที่', 'คำถาม', 'คำตอบ', 'ขยายความ', 'วันที่ตอบ'
+  ]);
+  ensureSheet_(ss, SHEETS.EXAM, [
+    'รหัสพนักงาน', 'ชื่อ-นามสกุล', 'รอบการสอบ', 'คะแนน (ข้อถูก)', 'คะแนนเต็ม (ข้อที่ตรวจอัตโนมัติ)',
+    'ร้อยละ', 'ผลสอบ', 'จำนวนข้อเขียนตอบรอ HR ตรวจ', 'วันที่สอบ'
   ]);
   ensureSheet_(ss, SHEETS.USERS, ['บทบาท', 'ชื่อผู้ใช้งาน', 'รหัสผ่าน']);
 
@@ -369,6 +374,7 @@ function upsertEmployee_(id, data) {
   rewriteChecklistSummary_(id, data);
   rewriteKpiSummary_(id, data);
   rewriteReflectionSummary_(id, data);
+  rewriteExamSummary_(id, data);
 }
 
 function deleteEmployee_(id) {
@@ -376,6 +382,7 @@ function deleteEmployee_(id) {
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.CHECKLIST), id);
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.KPI), id);
   deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.REFLECTION), id);
+  deleteRowsMatchingFirstCol_(sheetByName_(SHEETS.EXAM), id);
 }
 
 /* ---- profile photo upload (stored in Google Drive, linked onto the employee record) ---- */
@@ -501,6 +508,28 @@ function rewriteReflectionSummary_(id, data) {
 }
 function answerLabel_(a) {
   return { yes: 'ใช่', partial: 'บางส่วน', no: 'ไม่ใช่' }[a] || (a || '');
+}
+
+function examRoundLabel_(key) {
+  return { round1: 'ข้อสอบปฐมนิเทศ (วันปฐมนิเทศ)', round2: 'ข้อสอบก่อนผ่านทดลองงาน' }[key] || key;
+}
+function rewriteExamSummary_(id, data) {
+  var sheet = sheetByName_(SHEETS.EXAM);
+  deleteRowsMatchingFirstCol_(sheet, id);
+  var exams = data.exams || {};
+  var rows = [];
+  Object.keys(exams).forEach(function (roundKey) {
+    var r = exams[roundKey] || {};
+    var pct = r.autoMax ? Math.round((r.auto / r.autoMax) * 100) : 0;
+    var result = r.autoMax ? (pct >= 80 ? 'ผ่านเกณฑ์ (80%)' : 'ไม่ผ่านเกณฑ์ (80%)') : '-';
+    rows.push([
+      id, data.fullName || '', examRoundLabel_(roundKey),
+      r.auto != null ? r.auto : '', r.autoMax != null ? r.autoMax : '',
+      r.autoMax ? pct + '%' : '', result, r.manualPending || 0,
+      r.submittedAt ? Utilities.formatDate(new Date(r.submittedAt), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : ''
+    ]);
+  });
+  if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
 }
 
 /* ========================= shared helpers ========================= */
