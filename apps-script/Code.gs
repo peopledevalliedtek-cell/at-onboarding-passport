@@ -32,7 +32,7 @@ var SHEETS = {
 };
 var AUDIT_LOG_MAX_ROWS_RETURNED = 500; // avoid an ever-growing payload on every page load
 var LIST_CACHE_KEY = 'at_passport_list_v1';
-var LIST_CACHE_TTL_SECONDS = 5; // short-lived cache so polling doesn't re-read every sheet every 4-8s
+var LIST_CACHE_TTL_SECONDS = 3; // short-lived cache so frequent polling doesn't re-read every sheet each time
 
 var BRAND_RED = '#c0272d';
 var BRAND_DARK = '#3a1012';

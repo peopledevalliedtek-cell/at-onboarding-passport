@@ -599,7 +599,7 @@ function startPolling(){
   POLL_TIMER = setInterval(async ()=>{
     if(MODAL_OPEN || !API_URL || !getSession()) return;
     try{ await refreshDB(); render(); }catch(e){ /* keep last good state on a transient network error */ }
-  }, 8000);
+  }, 3000);
 }
 function getSession(){
   try{ return JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){ return null; }
