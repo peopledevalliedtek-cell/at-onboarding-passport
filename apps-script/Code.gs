@@ -31,6 +31,8 @@ var SHEETS = {
   JD_REGISTRY: 'ทะเบียนแผนก-ตำแหน่งงาน'
 };
 var AUDIT_LOG_MAX_ROWS_RETURNED = 500; // avoid an ever-growing payload on every page load
+var LIST_CACHE_KEY = 'at_passport_list_v1';
+var LIST_CACHE_TTL_SECONDS = 5; // short-lived cache so polling doesn't re-read every sheet every 4-8s
 
 var BRAND_RED = '#c0272d';
 var BRAND_DARK = '#3a1012';
@@ -41,7 +43,12 @@ function doGet(e) {
   try {
     var action = (e && e.parameter && e.parameter.action) || 'list';
     if (action === 'list') {
-      return jsonResponse_({
+      var cache = CacheService.getScriptCache();
+      var cached = cache.get(LIST_CACHE_KEY);
+      if (cached) {
+        return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+      }
+      var payload = {
         ok: true,
         settings: readSettings_(),
         templates: readTemplates_(),
@@ -51,7 +58,10 @@ function doGet(e) {
         redFlagCases: readRedFlagCases_(),
         smartJDs: readSmartJDs_(),
         positionRegistry: readPositionRegistry_()
-      });
+      };
+      var json = JSON.stringify(payload);
+      try { cache.put(LIST_CACHE_KEY, json, LIST_CACHE_TTL_SECONDS); } catch (cacheErr) { /* payload too large for cache (>100KB) — skip caching, still serve the data */ }
+      return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
     }
     return jsonResponse_({ ok: false, error: 'unknown action: ' + action });
   } catch (err) {
@@ -59,10 +69,20 @@ function doGet(e) {
   }
 }
 
+var LIST_MUTATING_ACTIONS = {
+  setSettings: 1, setUsers: 1, setTemplate: 1, deleteTemplate: 1, setEmployee: 1, deleteEmployee: 1,
+  uploadPhoto: 1, logAudit: 1, setRedFlagCase: 1, deleteRedFlagCase: 1, setSmartJD: 1, deleteSmartJD: 1,
+  setPositionRegistry: 1
+};
+function invalidateListCache_() {
+  try { CacheService.getScriptCache().remove(LIST_CACHE_KEY); } catch (e) { /* best effort */ }
+}
+
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var action = body.action;
+    if (LIST_MUTATING_ACTIONS[action]) invalidateListCache_(); // so the next poll sees fresh data immediately
     if (action === 'setSettings') { writeSettings_(body.data); return jsonResponse_({ ok: true }); }
     if (action === 'setUsers') { writeUsers_(body.data); return jsonResponse_({ ok: true }); }
     if (action === 'setTemplate') { upsertTemplate_(body.id, body.data); return jsonResponse_({ ok: true }); }
