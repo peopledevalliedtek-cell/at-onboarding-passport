@@ -96,77 +96,56 @@ textarea{min-height:60px;resize:vertical;}
 
 /* ---------- Login screen ---------- */
 #login-screen{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
-  overflow:hidden;isolation:isolate;
-  background:linear-gradient(115deg,#8f1e23 0%,#c0272d 28%,#e5091a 48%,#a80000 68%,#3a1012 100%);
-  background-size:300% 300%;animation:loginGradient 18s ease infinite;}
-@keyframes loginGradient{0%{background-position:0% 45%;}50%{background-position:100% 55%;}100%{background-position:0% 45%;}}
+  overflow:hidden;isolation:isolate;background:linear-gradient(170deg,#eef5fb 0%,#f8f5f3 55%,#ffffff 100%);}
 
-/* decorative light trails (behind content, in front of gradient) */
-#login-screen::before,#login-screen::after{content:"";position:absolute;inset:-20%;z-index:0;pointer-events:none;
-  background:conic-gradient(from 0deg at 30% 40%, transparent 0deg, rgba(255,255,255,.07) 40deg, transparent 90deg);
-  animation:loginSweep 14s linear infinite;}
-#login-screen::after{background:conic-gradient(from 180deg at 70% 65%, transparent 0deg, rgba(255,120,120,.10) 50deg, transparent 110deg);
-  animation-duration:20s;animation-direction:reverse;}
-@keyframes loginSweep{to{transform:rotate(360deg);}}
-
-/* floating particles */
-.login-particles{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
-.login-particles span{position:absolute;bottom:-40px;display:block;border-radius:50%;
-  background:rgba(255,255,255,.55);box-shadow:0 0 10px 2px rgba(255,255,255,.35);
-  animation:particleFloat linear infinite;}
-.login-particles span:nth-child(1){left:6%;width:6px;height:6px;animation-duration:16s;animation-delay:0s;}
-.login-particles span:nth-child(2){left:18%;width:4px;height:4px;animation-duration:12s;animation-delay:2s;}
-.login-particles span:nth-child(3){left:32%;width:8px;height:8px;animation-duration:20s;animation-delay:1s;}
-.login-particles span:nth-child(4){left:48%;width:5px;height:5px;animation-duration:15s;animation-delay:4s;}
-.login-particles span:nth-child(5){left:63%;width:7px;height:7px;animation-duration:18s;animation-delay:3s;}
-.login-particles span:nth-child(6){left:77%;width:4px;height:4px;animation-duration:13s;animation-delay:5s;}
-.login-particles span:nth-child(7){left:88%;width:6px;height:6px;animation-duration:19s;animation-delay:1.5s;}
-.login-particles span:nth-child(8){left:94%;width:5px;height:5px;animation-duration:17s;animation-delay:6s;}
-@keyframes particleFloat{
-  0%{transform:translateY(0) translateX(0);opacity:0;}
-  10%{opacity:.8;}
-  90%{opacity:.5;}
-  100%{transform:translateY(-110vh) translateX(18px);opacity:0;}
-}
-
-.login-split{position:relative;z-index:1;display:flex;align-items:stretch;gap:40px;width:100%;max-width:1180px;}
-.login-brand-pane{position:relative;flex:1 1 58%;align-self:stretch;min-height:600px;color:#fff;overflow:hidden;
-  border-radius:26px;padding:30px 34px;display:flex;flex-direction:column;justify-content:space-between;
-  background-image:linear-gradient(200deg,rgba(20,4,5,.22) 0%,rgba(58,16,18,.58) 55%,rgba(15,3,4,.88) 100%),
+.login-hero-bg{position:absolute;inset:0;z-index:0;
+  background-image:linear-gradient(100deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.35) 48%, rgba(255,255,255,.72) 100%),
     url('assets/hero/allied-tek-building.webp');
-  background-size:cover;background-position:center;
-  box-shadow:0 30px 70px rgba(0,0,0,.35);}
-.brand-pane-topcaption{align-self:flex-end;font-style:italic;font-size:14px;line-height:1.35;text-align:right;
-  color:rgba(255,255,255,.88);animation:brandRise .8s ease .5s both;}
-.brand-pane-lockup{display:flex;align-items:center;gap:14px;animation:brandRise .8s ease .1s both;}
-.brand-pane-logo{width:64px;height:64px;object-fit:contain;border-radius:50%;flex:none;
-  border:3px solid rgba(255,255,255,.85);background:#fff;
-  filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));animation:logoFadeIn 1s ease both;}
-.brand-pane-title-sm{font-size:17px;font-weight:800;line-height:1.25;}
-.brand-pane-tag-sm{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#ffd9d9;
-  font-weight:600;margin-top:2px;}
-.brand-pane-hero{margin:auto 0;padding:18px 0;}
-.grow-together{font-size:clamp(32px,4.4vw,52px);font-weight:800;line-height:1.08;margin-bottom:12px;
-  animation:brandRise .8s ease .25s both;}
-.grow-together b{color:#ff6b6b;font-style:italic;font-weight:800;}
-.grow-quote{font-size:16px;font-style:italic;color:rgba(255,255,255,.88);animation:brandRise .8s ease .4s both;}
-.brand-pane-features{display:flex;gap:22px;flex-wrap:wrap;animation:brandRise .8s ease .55s both;}
-.bpf-item{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11.5px;font-weight:600;
-  color:#fff;text-align:center;width:82px;line-height:1.3;}
-.bpf-ic{width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);
-  display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(255,255,255,.1);}
+  background-size:cover;background-position:center 32%;}
+
+.login-topwedge{position:absolute;top:0;right:0;z-index:1;width:48%;height:58%;pointer-events:none;
+  background:linear-gradient(135deg,#e5091a 0%,#8f1e23 100%);clip-path:polygon(100% 0,100% 100%,22% 0);}
+.login-topwedge::after{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(115deg,transparent 0 40px,rgba(255,255,255,.06) 40px 41px);
+  animation:wedgeShimmer 9s linear infinite;}
+@keyframes wedgeShimmer{from{transform:translateX(0);}to{transform:translateX(120px);}}
+
+.login-caption{position:absolute;z-index:2;top:30px;right:40px;max-width:260px;text-align:right;
+  font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:17px;line-height:1.3;color:#fff;
+  text-shadow:0 2px 6px rgba(0,0,0,.25);animation:brandRise .8s ease .5s both;}
+
+.login-wave{position:absolute;left:0;right:0;bottom:-2px;z-index:1;height:160px;pointer-events:none;}
+.login-wave svg{position:absolute;bottom:0;width:100%;height:100%;}
+.brand-pane-features{position:absolute;left:0;right:0;bottom:14px;z-index:2;display:flex;justify-content:center;
+  gap:50px;flex-wrap:wrap;animation:brandRise .8s ease .6s both;}
+.bpf-item{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11.5px;font-weight:700;
+  color:#fff;text-align:center;width:88px;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,.3);}
+.bpf-ic{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.8);
+  display:flex;align-items:center;justify-content:center;font-size:19px;background:rgba(255,255,255,.16);}
+
+.login-split{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  width:100%;max-width:1280px;padding:0 40px;gap:30px;}
+.login-brand-pane{flex:1 1 56%;padding:30px 10px 200px;color:#33373d;}
+.brand-pane-lockup{display:flex;align-items:center;gap:16px;margin-bottom:30px;animation:brandRise .8s ease .1s both;}
+.brand-pane-logo{width:92px;height:92px;object-fit:contain;border-radius:50%;flex:none;
+  border:3px solid #fff;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.18);animation:logoFadeIn 1s ease both;}
+.brand-pane-title-sm{font-size:26px;font-weight:800;line-height:1.25;color:#33373d;}
+.brand-pane-title-sm b{color:var(--red);}
+.brand-pane-tag-sm{font-size:16px;font-weight:600;color:#6b7078;margin-top:4px;}
+.brand-pane-tag-sm i{color:var(--red);font-style:normal;margin:0 7px;}
+.brand-pane-hero{animation:brandRise .8s ease .25s both;}
+.grow-together{font-size:clamp(30px,4.2vw,48px);font-weight:800;line-height:1.1;margin-bottom:10px;color:#33373d;}
+.grow-together b{color:var(--red);font-style:italic;font-weight:800;}
+.grow-quote{font-size:17px;font-style:italic;color:#4d525a;}
 @keyframes logoFadeIn{from{opacity:0;transform:translateY(-10px) scale(.92);}to{opacity:1;transform:none;}}
 @keyframes brandRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
 
-.login-card{position:relative;z-index:1;align-self:center;background:rgba(255,255,255,.92);
-  backdrop-filter:blur(18px) saturate(160%);
-  -webkit-backdrop-filter:blur(18px) saturate(160%);border:1px solid rgba(255,255,255,.5);
-  border-radius:22px;padding:34px 30px;max-width:380px;width:100%;flex:none;
-  box-shadow:0 25px 60px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.08) inset;
+.login-card{position:relative;z-index:3;background:rgba(255,255,255,.95);border-radius:22px;
+  padding:30px 30px 24px;max-width:380px;width:100%;flex:none;box-shadow:0 25px 60px rgba(0,0,0,.25);
   animation:cardFloatIn .7s cubic-bezier(.2,.9,.3,1) both;}
 @keyframes cardFloatIn{from{opacity:0;transform:translateY(26px) scale(.97);}to{opacity:1;transform:none;}}
 .login-card-head{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
-.login-logo{width:50px;height:50px;border-radius:50%;background:#fff;color:#fff;font-weight:800;
+.login-logo{width:50px;height:50px;border-radius:14px;background:#fff;color:#fff;font-weight:800;
   font-size:20px;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;
   box-shadow:0 2px 8px rgba(0,0,0,.18);animation:logoFadeIn .8s ease both;}
 .login-logo img{width:100%;height:100%;object-fit:contain;}
@@ -177,7 +156,10 @@ textarea{min-height:60px;resize:vertical;}
   font-size:12px;font-weight:700;color:var(--sub);transition:all .15s ease;}
 .role-opt:hover{border-color:#f3b9b9;background:#fff6f6;}
 .role-opt.active{border-color:var(--red);color:var(--red);background:#fbe9e8;}
-.login-foot{margin-top:18px;text-align:center;font-size:11.5px;color:#9aa0a6;}
+.login-card-divider{margin:18px 0 8px;border:none;border-top:1px solid var(--line);}
+.login-card-tag{text-align:center;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:#c7a9aa;font-weight:700;}
+.login-foot{margin-top:6px;text-align:center;font-size:11.5px;color:#9aa0a6;}
 
 /* button hover / ripple sheen — scoped to the login screen only */
 #login-screen .btn-primary{position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .2s ease;}
@@ -189,8 +171,10 @@ textarea{min-height:60px;resize:vertical;}
 #login-screen .btn-primary:hover::after{left:140%;}
 
 @media(max-width:980px){
-  .login-split{flex-direction:column;gap:18px;}
-  .login-brand-pane{display:none;}
+  .login-split{flex-direction:column;padding:0 20px;}
+  .login-brand-pane,.login-topwedge,.login-caption,.login-wave,.brand-pane-features,.login-hero-bg{display:none;}
+  #login-screen{background:linear-gradient(160deg,#c0272d 0%,#8f1e23 55%,#3a1012 100%);}
+  .login-card{background:rgba(255,255,255,.96);}
 }
 @media(max-width:420px){
   .login-card{padding:26px 20px;border-radius:18px;}
@@ -198,11 +182,9 @@ textarea{min-height:60px;resize:vertical;}
   .role-grid{gap:6px;}
 }
 @media(prefers-reduced-motion:reduce){
-  #login-screen,#login-screen::before,#login-screen::after,.login-particles span,
-  .brand-pane-logo,.brand-pane-topcaption,.brand-pane-lockup,.brand-pane-hero,.brand-pane-features,
-  .login-card,.login-logo,
+  .login-topwedge::after,.brand-pane-logo,.login-caption,.brand-pane-lockup,.brand-pane-hero,
+  .brand-pane-features,.login-card,.login-logo,
   #login-screen .btn-primary::after{animation:none!important;transition:none!important;}
-  .login-particles{display:none;}
 }
 
 /* ---------- App shell ---------- */
@@ -860,26 +842,38 @@ let loginRole = "employee";
 function renderLogin(){
   return `
   <div id="login-screen">
-    <div class="login-particles" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="login-hero-bg" aria-hidden="true"></div>
+    <div class="login-topwedge" aria-hidden="true"></div>
+    <div class="login-caption">Empowering People<br>for a Better Tomorrow</div>
+    <div class="login-wave" aria-hidden="true">
+      <svg viewBox="0 0 1440 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#e5091a"/>
+            <stop offset="100%" stop-color="#7a0f14"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,110 C240,40 480,170 720,105 C960,40 1200,150 1440,85 L1440,200 L0,200 Z" fill="url(#waveGrad)"></path>
+      </svg>
+    </div>
+    <div class="brand-pane-features">
+      <div class="bpf-item"><span class="bpf-ic">🤝</span>Onboarding Experience</div>
+      <div class="bpf-item"><span class="bpf-ic">📈</span>Learning &amp; Development</div>
+      <div class="bpf-item"><span class="bpf-ic">👥</span>People Engagement</div>
+      <div class="bpf-item"><span class="bpf-ic">⭐</span>Career Growth</div>
+    </div>
     <div class="login-split">
       <div class="login-brand-pane">
-        <div class="brand-pane-topcaption">Empowering People<br>for a Better Tomorrow</div>
         <div class="brand-pane-lockup">
           <img class="brand-pane-logo" src="assets/logo/allied-tek-mark.png" alt="Allied-Tek">
           <div>
-            <div class="brand-pane-title-sm">AT Digital Onboarding Passport</div>
-            <div class="brand-pane-tag-sm">Connect · Learn · Grow</div>
+            <div class="brand-pane-title-sm">AT Digital <b>Onboarding</b> Passport</div>
+            <div class="brand-pane-tag-sm">Connect<i>·</i>Learn<i>·</i>Grow</div>
           </div>
         </div>
         <div class="brand-pane-hero">
           <div class="grow-together">Grow <b>Together</b></div>
           <div class="grow-quote">"Building a stronger tomorrow, together"</div>
-        </div>
-        <div class="brand-pane-features">
-          <div class="bpf-item"><span class="bpf-ic">🤝</span>Onboarding Experience</div>
-          <div class="bpf-item"><span class="bpf-ic">📈</span>Learning &amp; Development</div>
-          <div class="bpf-item"><span class="bpf-ic">👥</span>People Engagement</div>
-          <div class="bpf-item"><span class="bpf-ic">⭐</span>Career Growth</div>
         </div>
       </div>
       <div class="login-card">
@@ -896,7 +890,9 @@ function renderLogin(){
           <div class="role-opt ${loginRole==='hr'?'active':''}" data-role="hr">HR Admin</div>
         </div>
         <div id="login-fields"></div>
-        <button class="btn btn-primary" id="login-btn" style="width:100%;justify-content:center;margin-top:6px;">เข้าสู่ระบบ</button>
+        <button class="btn btn-primary" id="login-btn" style="width:100%;justify-content:center;margin-top:6px;">เข้าสู่ระบบ →</button>
+        <hr class="login-card-divider">
+        <div class="login-card-tag">People Development</div>
         <div class="login-foot">© ${new Date().getFullYear()+543} Allied-Tek · People & Organization Management</div>
       </div>
     </div>
