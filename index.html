@@ -18,6 +18,8 @@
   --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.06);
   --navy-dark:#0a1e3d; --navy:#122a52; --blue:#2f6fed; --blue-soft:#eaf1ff;
   --purple:#7c5cf0; --purple-soft:#f1ecfe; --green-soft:#e7f6ef; --amber-soft:#fbf0dc;
+  --ease-out:cubic-bezier(.16,1,.3,1); --ease-in-out:cubic-bezier(.4,0,.2,1);
+  --dur-fast:.16s; --dur-base:.28s; --dur-slow:.5s;
   font-size:16px;
 }
 *{box-sizing:border-box;}
@@ -28,20 +30,31 @@ button{font-family:inherit;}
 a{color:inherit;}
 #app{min-height:100vh;display:flex;flex-direction:column;}
 .hidden{display:none !important;}
-.btn{border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;
-  cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s;}
+.btn{border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;position:relative;
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;overflow:hidden;
+  transition:background var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out),
+  box-shadow var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out);}
+.btn::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.35);border-radius:inherit;
+  transform:scale(0);opacity:0;transition:transform .35s var(--ease-out),opacity .5s;pointer-events:none;}
+.btn:active::after{transform:scale(1);opacity:1;transition:none;}
+.btn:not(:disabled):hover{transform:translateY(-1px);}
+.btn:not(:disabled):active{transform:translateY(0) scale(.97);}
 .btn-primary{background:var(--red);color:#fff;}
-.btn-primary:hover{background:var(--red-dark);}
+.btn-primary:hover{background:var(--red-dark);box-shadow:0 6px 16px rgba(192,39,45,.3);}
 .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
 .btn-ghost:hover{background:#f0f1f3;}
 .btn-sm{padding:6px 12px;font-size:13px;border-radius:8px;}
 .btn-danger{background:#fff;color:#b3261e;border:1px solid #f3c7c4;}
+.btn-danger:hover{background:#fdf2f1;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn:disabled:hover{transform:none;}
 input,select,textarea{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);
   border-radius:9px;background:#fff;color:var(--ink);width:100%;}
 input:focus,select:focus,textarea:focus{outline:2px solid #e3b3b3;border-color:var(--red);}
 label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--sub);font-weight:600;margin-bottom:10px;}
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;
+  transition:transform var(--dur-base) var(--ease-out),box-shadow var(--dur-base) var(--ease-out);}
+.card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.09);}
 .grid{display:grid;gap:14px;}
 .grid-2{grid-template-columns:repeat(2,1fr);}
 .grid-3{grid-template-columns:repeat(3,1fr);}
@@ -51,7 +64,10 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;}
 th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
 th{color:var(--sub);font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;}
 tr:last-child td{border-bottom:none;}
-.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+tbody tr{transition:background var(--dur-fast) var(--ease-out);}
+tbody tr:hover{background:#fafbfc;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;
+  transition:transform var(--dur-fast) var(--ease-out);}
 .pill-green{background:#e6f4ea;color:var(--green);}
 .pill-amber{background:#fdf1dc;color:var(--amber);}
 .pill-gray{background:#eef0f2;color:var(--sub);}
@@ -69,30 +85,74 @@ h1,h2,h3,h4{margin:0 0 4px;}
 .gap-8{gap:8px;} .gap-10{gap:10px;} .gap-16{gap:16px;}
 .mt-8{margin-top:8px;} .mt-16{margin-top:16px;} .mt-24{margin-top:24px;}
 .progress-track{height:8px;border-radius:999px;background:#eef0f2;overflow:hidden;}
-.progress-fill{height:100%;background:var(--red);border-radius:999px;transition:width .3s;}
+.progress-fill{height:100%;background:var(--red);border-radius:999px;transition:width .8s var(--ease-out);}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2328;color:#fff;
   padding:11px 20px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow);z-index:999;opacity:0;
   pointer-events:none;transition:opacity .25s, transform .25s;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
 .modal-overlay{position:fixed;inset:0;background:rgba(20,20,24,.5);display:flex;align-items:flex-start;
-  justify-content:center;padding:4vh 16px;overflow-y:auto;z-index:500;}
+  justify-content:center;padding:4vh 16px;overflow-y:auto;z-index:500;animation:overlayIn var(--dur-base) var(--ease-out) both;}
+.modal-overlay.closing{animation:overlayOut var(--dur-fast) ease both;}
 .modal{background:#fff;border-radius:16px;max-width:680px;width:100%;padding:22px;box-shadow:var(--shadow);
-  margin-bottom:4vh;}
+  margin-bottom:4vh;animation:modalIn var(--dur-base) var(--ease-out) both;}
+.modal-overlay.closing .modal{animation:modalOut var(--dur-fast) ease both;}
 .modal-wide{max-width:920px;}
+@keyframes overlayIn{from{opacity:0;}to{opacity:1;}}
+@keyframes overlayOut{from{opacity:1;}to{opacity:0;}}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px) scale(.98);}to{opacity:1;transform:none;}}
+@keyframes modalOut{from{opacity:1;transform:none;}to{opacity:0;transform:translateY(10px) scale(.98);}}
 .checklist-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:flex-start;
   padding:10px 0;border-bottom:1px solid var(--line);}
 .checklist-row:last-child{border-bottom:none;}
 .chk-box{width:22px;height:22px;border-radius:6px;border:2px solid var(--line);cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex:none;margin-top:2px;}
-.chk-box.done{background:var(--green);border-color:var(--green);}
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex:none;margin-top:2px;
+  transition:background var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out);}
+.chk-box:hover{transform:scale(1.08);}
+.chk-box.done{background:var(--green);border-color:var(--green);animation:checkPop .35s var(--ease-out);}
+@keyframes checkPop{0%{transform:scale(.6);}60%{transform:scale(1.18);}100%{transform:scale(1);}}
 .tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);padding-bottom:0;}
 .tab{padding:9px 14px;font-size:13.5px;font-weight:600;color:var(--sub);border-bottom:2px solid transparent;
-  cursor:pointer;white-space:nowrap;}
+  cursor:pointer;white-space:nowrap;transition:color var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out);}
 .tab.active{color:var(--red);border-color:var(--red);}
 .radio-row{display:flex;gap:16px;flex-wrap:wrap;}
 .radio-opt{display:flex;align-items:center;gap:5px;font-size:13.5px;cursor:pointer;}
 .radio-opt input{width:auto;}
 textarea{min-height:60px;resize:vertical;}
+
+/* ---------- Global animation system (design tokens above) ---------- */
+.count-num{font-variant-numeric:tabular-nums;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+.content-enter{animation:contentFadeIn var(--dur-slow) var(--ease-out) both;}
+@keyframes contentFadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.anim-fade-up{animation:fadeUp var(--dur-base) var(--ease-out) both;
+  animation-delay:calc(var(--i, 0) * 55ms);}
+/* confetti burst (checklist / milestone celebration) */
+.confetti-piece{position:absolute;top:40%;left:50%;width:8px;height:8px;border-radius:2px;pointer-events:none;
+  animation:confettiBurst .9s ease-out forwards;z-index:5;}
+@keyframes confettiBurst{
+  0%{transform:translate(0,0) rotate(0deg);opacity:1;}
+  100%{transform:var(--confetti-end, translate(0,0)) rotate(540deg);opacity:0;}
+}
+/* branded boot loader */
+.boot-loader{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;background:linear-gradient(170deg,#eef5fb 0%,#f8f5f3 55%,#ffffff 100%);}
+.boot-logo{width:96px;height:96px;border-radius:50%;object-fit:contain;background:#fff;
+  border:3px solid #fff;box-shadow:0 10px 30px rgba(0,0,0,.18);animation:bootPulse 1.7s ease-in-out infinite;}
+@keyframes bootPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+.boot-title{font-size:16px;font-weight:800;color:#33373d;}
+.boot-skel{display:flex;flex-direction:column;gap:8px;width:220px;}
+.boot-skel-bar{height:10px;border-radius:6px;background:linear-gradient(90deg,#e9edf1 25%,#f6f8fa 37%,#e9edf1 63%);
+  background-size:400% 100%;animation:skelShimmer 1.4s ease-in-out infinite;}
+.boot-skel-bar:nth-child(2){width:75%;}
+.boot-skel-bar:nth-child(3){width:55%;}
+@keyframes skelShimmer{0%{background-position:100% 0;}100%{background-position:-100% 0;}}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;scroll-behavior:auto !important;
+  }
+}
 
 /* ---------- Login screen ---------- */
 #login-screen{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
@@ -196,10 +256,17 @@ textarea{min-height:60px;resize:vertical;}
 .brand .mark img{width:100%;height:100%;object-fit:cover;}
 .brand .txt{font-weight:800;font-size:14.5px;line-height:1.2;}
 .brand .txt small{display:block;font-weight:500;color:#9fb0cc;font-size:10.5px;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:#c3cee3;
-  font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:2px;}
-.nav-item:hover{background:#17335f;color:#fff;}
+.nav-item{position:relative;display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:#c3cee3;
+  font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:2px;overflow:hidden;
+  transition:background var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out);}
+.nav-item::before{content:"";position:absolute;left:0;top:4px;bottom:4px;width:3px;border-radius:0 3px 3px 0;
+  background:#fff;transform:scaleY(0);transition:transform var(--dur-fast) var(--ease-out);}
+.nav-item.active::before{transform:scaleY(1);}
+.nav-item span:first-child{display:inline-block;transition:transform var(--dur-fast) var(--ease-out);}
+.nav-item:hover span:first-child{transform:scale(1.15);}
+.nav-item:hover{background:#17335f;color:#fff;transform:translateX(2px);}
 .nav-item.active{background:var(--blue);color:#fff;}
+.nav-item:active{transform:translateX(2px) scale(.98);}
 .side-foot{margin-top:auto;padding:10px;font-size:11.5px;color:#9fb0cc;}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;}
 .topbar{background:#fff;border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;
@@ -227,12 +294,15 @@ textarea{min-height:60px;resize:vertical;}
 .passport-hero .meta{font-size:13px;opacity:.92;margin-top:6px;}
 .timeline{display:flex;gap:6px;margin-top:14px;}
 .timeline .seg{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.3);overflow:hidden;}
-.timeline .seg b{display:block;height:100%;background:#fff;}
+.timeline .seg b{display:block;height:100%;background:#fff;transition:width .9s var(--ease-out);}
 
 .info-card{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);
-  display:flex;align-items:center;gap:13px;}
+  display:flex;align-items:center;gap:13px;
+  transition:transform var(--dur-base) var(--ease-out),box-shadow var(--dur-base) var(--ease-out);}
+.info-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.09);}
 .info-card .ic{width:40px;height:40px;border-radius:50%;flex:none;display:flex;align-items:center;
-  justify-content:center;font-size:18px;}
+  justify-content:center;font-size:18px;transition:transform var(--dur-base) var(--ease-out);}
+.info-card:hover .ic{transform:scale(1.1) rotate(-4deg);}
 .info-card .ic-blue{background:var(--blue-soft);}
 .info-card .ic-purple{background:var(--purple-soft);}
 .info-card .ic-green{background:var(--green-soft);}
@@ -255,8 +325,11 @@ textarea{min-height:60px;resize:vertical;}
 .quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
 .quick-item{background:var(--bg);border-radius:12px;padding:13px 6px;display:flex;flex-direction:column;
   align-items:center;gap:6px;font-size:11.5px;text-align:center;cursor:pointer;border:none;color:var(--ink);
-  font-family:inherit;}
-.quick-item .em{font-size:19px;}
+  font-family:inherit;transition:transform var(--dur-fast) var(--ease-out),box-shadow var(--dur-fast) var(--ease-out);}
+.quick-item:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 8px 18px rgba(0,0,0,.1);}
+.quick-item:active{transform:translateY(0) scale(.97);}
+.quick-item .em{font-size:19px;transition:transform var(--dur-fast) var(--ease-out);}
+.quick-item:hover .em{transform:scale(1.15);}
 .quick-item.blue{background:var(--blue-soft);}
 .quick-item.green{background:var(--green-soft);}
 .quick-item.purple{background:var(--purple-soft);}
@@ -271,7 +344,13 @@ textarea{min-height:60px;resize:vertical;}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app">
+  <div class="boot-loader">
+    <img class="boot-logo" src="assets/logo/allied-tek-mark.png" alt="Allied-Tek">
+    <div class="boot-title">AT Digital Onboarding Passport</div>
+    <div class="boot-skel"><div class="boot-skel-bar"></div><div class="boot-skel-bar"></div><div class="boot-skel-bar"></div></div>
+  </div>
+</div>
 <div id="toast" class="toast"></div>
 
 <script src="vendor/pdf-lib.min.js"></script>
@@ -650,7 +729,57 @@ function employeeMilestone(emp){
 /* =========================================================================
    RENDER / ROUTER
    ========================================================================= */
-let STATE = { sidebarOpen:false, route:"dashboard", params:{}, examActiveRound:null, examDraft:{} };
+let STATE = { sidebarOpen:false, route:"dashboard", params:{}, examActiveRound:null, examDraft:{}, lastRouteKey:null };
+const REDUCE_MOTION = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+/* ---------------------- Animation helpers (global motion system) ---------------------- */
+function animateCount(el, target, duration){
+  if(REDUCE_MOTION || !isFinite(target)){ el.textContent = target; return; }
+  const start = performance.now();
+  function tick(now){
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(target * eased);
+    if(t < 1) requestAnimationFrame(tick); else el.textContent = target;
+  }
+  requestAnimationFrame(tick);
+}
+function enhanceAnimations(root, isNewRoute){
+  if(!root) return;
+  // width-based bars/timelines: let them transition smoothly to their target on every render (including poll refreshes)
+  root.querySelectorAll(".progress-fill[style*='width'], .timeline .seg b[style*='width']").forEach(el=>{
+    if(REDUCE_MOTION) return;
+    const target = el.style.width;
+    el.style.width = "0%";
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.style.width = target; }));
+  });
+  if(!isNewRoute) return; // entrance/stagger/count-up only on a genuine navigation, never on background poll refreshes
+  if(!REDUCE_MOTION){
+    root.querySelectorAll(".grid, .quick-grid, .stat-ring-grid, .brand-pane-features").forEach(grid=>{
+      Array.from(grid.children).forEach((child,i)=>{
+        child.style.setProperty("--i", i);
+        child.classList.add("anim-fade-up");
+      });
+    });
+  }
+  root.querySelectorAll(".count-num[data-target]").forEach(el=>{
+    animateCount(el, parseFloat(el.dataset.target)||0, 700);
+  });
+}
+function celebrateConfetti(container){
+  if(!container || REDUCE_MOTION) return;
+  const colors = ["#c0272d","#2f6fed","#1a7f45","#7c5cf0","#e5091a","#ffd166"];
+  for(let i=0;i<18;i++){
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    const angle = Math.random()*Math.PI*2, dist = 60+Math.random()*90;
+    piece.style.setProperty("--confetti-end", `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist-40}px)`);
+    piece.style.background = colors[i % colors.length];
+    piece.style.animationDelay = (Math.random()*0.12)+"s";
+    container.appendChild(piece);
+    piece.addEventListener("animationend", ()=>piece.remove());
+  }
+}
 
 /* ---------------------- Orientation & pre-probation exams ---------------------- */
 const QUIZ_ROUND1 = [
@@ -1038,36 +1167,38 @@ function renderRoute(session){
   };
   document.getElementById("page-title").textContent = titleMap[STATE.route] || "";
 
-  if(STATE.route === "policies"){ content.innerHTML = renderPolicies(); bindAfterRoute(session); return; }
-  if(STATE.route === "auditlog" && session.role==="hr"){ content.innerHTML = renderAuditLog(); bindAfterRoute(session); return; }
-  if(STATE.route === "redflag"){
-    content.innerHTML = session.role==="hr" ? renderHRRedFlag() : renderEmployeeRedFlag(session);
-    bindAfterRoute(session);
-    return;
-  }
-  if(STATE.route === "smartjd" && session.role==="hr"){ content.innerHTML = renderHRSmartJD(); bindAfterRoute(session); return; }
-  if(STATE.route === "myjd"){ content.innerHTML = renderEmployeeMyJD(session); bindAfterRoute(session); return; }
-
-  if(session.role === "hr"){
-    if(STATE.route==="dashboard") content.innerHTML = renderHRDashboard();
-    else if(STATE.route==="employees") content.innerHTML = renderEmployeeManagement();
-    else if(STATE.route==="templates") content.innerHTML = renderTemplates();
-    else if(STATE.route==="reports") content.innerHTML = renderReports();
-    else if(STATE.route==="settings") content.innerHTML = renderSettings();
-    bindAfterRoute(session);
+  let html = "";
+  if(STATE.route === "policies"){ html = renderPolicies(); }
+  else if(STATE.route === "auditlog" && session.role==="hr"){ html = renderAuditLog(); }
+  else if(STATE.route === "redflag"){ html = session.role==="hr" ? renderHRRedFlag() : renderEmployeeRedFlag(session); }
+  else if(STATE.route === "smartjd" && session.role==="hr"){ html = renderHRSmartJD(); }
+  else if(STATE.route === "myjd"){ html = renderEmployeeMyJD(session); }
+  else if(session.role === "hr"){
+    if(STATE.route==="dashboard") html = renderHRDashboard();
+    else if(STATE.route==="employees") html = renderEmployeeManagement();
+    else if(STATE.route==="templates") html = renderTemplates();
+    else if(STATE.route==="reports") html = renderReports();
+    else if(STATE.route==="settings") html = renderSettings();
   } else if(session.role === "supervisor"){
-    if(STATE.route==="dashboard") content.innerHTML = renderSupervisorTeam(session);
-    else if(STATE.route==="approval") content.innerHTML = renderSupervisorApproval(session);
-    bindAfterRoute(session);
+    if(STATE.route==="dashboard") html = renderSupervisorTeam(session);
+    else if(STATE.route==="approval") html = renderSupervisorApproval(session);
   } else {
     const emp = DB.employees.find(e=>e.id===session.employeeId);
-    if(!emp){ content.innerHTML = `<div class="card">ไม่พบข้อมูลพนักงาน</div>`; return; }
-    if(STATE.route==="dashboard") content.innerHTML = renderEmployeePassport(emp);
-    else if(STATE.route==="journey") content.innerHTML = renderEmployeeJourney(emp);
-    else if(STATE.route==="exam") content.innerHTML = renderEmployeeExam(emp);
-    else if(STATE.route==="reflection") content.innerHTML = renderEmployeeReflection(emp);
-    bindAfterRoute(session);
+    if(!emp){ html = `<div class="card">ไม่พบข้อมูลพนักงาน</div>`; }
+    else if(STATE.route==="dashboard") html = renderEmployeePassport(emp);
+    else if(STATE.route==="journey") html = renderEmployeeJourney(emp);
+    else if(STATE.route==="exam") html = renderEmployeeExam(emp);
+    else if(STATE.route==="reflection") html = renderEmployeeReflection(emp);
   }
+
+  const routeKey = session.role + ":" + STATE.route;
+  const isNewRoute = STATE.lastRouteKey !== routeKey;
+  STATE.lastRouteKey = routeKey;
+
+  content.innerHTML = html;
+  content.classList.toggle("content-enter", isNewRoute);
+  bindAfterRoute(session);
+  enhanceAnimations(content, isNewRoute);
 }
 
 /* =========================================================================
@@ -2080,10 +2211,10 @@ function renderHRDashboard(){
   });
   return `
   <div class="grid grid-4">
-    <div class="card"><div class="muted small">พนักงานอยู่ระหว่าง Onboarding</div><h1>${active.length}</h1></div>
-    <div class="card"><div class="muted small">ความคืบหน้าเฉลี่ย</div><h1>${avgProgress}%</h1></div>
-    <div class="card"><div class="muted small">ใกล้ครบกำหนดทดลองงาน (≤10 วัน)</div><h1>${nearDue.length}</h1></div>
-    <div class="card"><div class="muted small">Template ที่ใช้งานอยู่</div><h1>${DB.templates.length}</h1></div>
+    <div class="card"><div class="muted small">พนักงานอยู่ระหว่าง Onboarding</div><h1><span class="count-num" data-target="${active.length}">0</span></h1></div>
+    <div class="card"><div class="muted small">ความคืบหน้าเฉลี่ย</div><h1><span class="count-num" data-target="${avgProgress}">0</span>%</h1></div>
+    <div class="card"><div class="muted small">ใกล้ครบกำหนดทดลองงาน (≤10 วัน)</div><h1><span class="count-num" data-target="${nearDue.length}">0</span></h1></div>
+    <div class="card"><div class="muted small">Template ที่ใช้งานอยู่</div><h1><span class="count-num" data-target="${DB.templates.length}">0</span></h1></div>
   </div>
   <div class="section-title">พนักงานที่กำลังติดตาม</div>
   <div class="card">
@@ -2433,8 +2564,8 @@ function renderEmployeePassport(emp){
   <div class="section-title">📊 สรุปข้อมูลของคุณ</div>
   <div class="card">
     <div class="stat-ring-grid">
-      <div><div class="stat-ring">✅</div><div class="stat-num">${p}%</div><div class="stat-lbl">Checklist เสร็จแล้ว</div></div>
-      <div><div class="stat-ring">📅</div><div class="stat-num">${dayNo}/${emp.durationDays}</div><div class="stat-lbl">วันที่ทดลองงาน</div></div>
+      <div><div class="stat-ring">✅</div><div class="stat-num"><span class="count-num" data-target="${p}">0</span>%</div><div class="stat-lbl">Checklist เสร็จแล้ว</div></div>
+      <div><div class="stat-ring">📅</div><div class="stat-num"><span class="count-num" data-target="${dayNo}">0</span>/${emp.durationDays}</div><div class="stat-lbl">วันที่ทดลองงาน</div></div>
       <div><div class="stat-ring">📝</div><div class="stat-num">${examLabel}</div><div class="stat-lbl">คะแนนสอบปฐมนิเทศ</div></div>
     </div>
   </div>
@@ -2583,7 +2714,11 @@ function openModal(html){
 }
 function closeModal(id){
   MODAL_OPEN = false;
-  document.getElementById(id)?.remove();
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(REDUCE_MOTION){ el.remove(); return; }
+  el.classList.add("closing");
+  setTimeout(()=>el.remove(), 180);
 }
 
 function bindExamReviewButtons(root){
@@ -2882,12 +3017,18 @@ function bindSupervisorChecklistModal(emp, session){
     el.onclick = ()=>{
       const item = findItem(el.dataset.sChk);
       if(!item) return;
+      const wasAllDone = Object.values(emp.checklist).every(list=>list.every(i=>i.done));
       item.done = !item.done;
       item.date = item.done ? today() : "";
       el.classList.toggle("done", item.done);
       el.textContent = item.done ? "✓" : "";
       const dateEl = document.querySelector(`[data-s-date="${item.id}"]`);
       if(dateEl) dateEl.textContent = item.date ? fmtDate(item.date) : "";
+      const nowAllDone = Object.values(emp.checklist).every(list=>list.every(i=>i.done));
+      if(item.done && !wasAllDone && nowAllDone){
+        celebrateConfetti(document.getElementById("s-chk-modal-overlay"));
+        toast("🎉 Checklist ครบทุกข้อแล้ว!");
+      }
     };
   });
   document.querySelectorAll("[data-s-note]").forEach(el=>{
